@@ -125,6 +125,7 @@ impl Serialize for InParallelStep {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(untagged)]
 pub enum Step {
     Get(GetStep),
     Put(PutStep),
