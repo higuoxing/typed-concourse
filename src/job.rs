@@ -1,6 +1,5 @@
 use crate::core::Identifier;
-use crate::errors::Errors;
-use crate::step::InParallelStep;
+use crate::step::InParallel;
 use crate::step::Step;
 use serde::Serialize;
 
@@ -18,15 +17,15 @@ impl Job {
         }
     }
 
-    pub fn then(mut self, step: Step) -> Result<Self, Errors> {
+    pub fn then(mut self, step: Step) -> Self {
         self.plan.push(step);
-        Ok(self)
+        self
     }
 
-    pub fn parallel(mut self, steps: &Vec<Step>) -> Result<Self, Errors> {
+    pub fn parallel(mut self, steps: &Vec<Step>) -> Self {
         self.plan
-            .push(Step::InParallel(InParallelStep::Steps(steps.clone())));
-        Ok(self)
+            .push(Step::InParallel(InParallel::Steps(steps.clone())));
+        self
     }
 
     pub fn plan(&self) -> &Vec<Step> {

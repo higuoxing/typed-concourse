@@ -8,6 +8,8 @@ pub type Identifier = String;
 pub type FilePath = String;
 // https://concourse-ci.org/config-basics.html#schema.config
 pub type Config = HashMap<String, String>;
+// https://concourse-ci.org/config-basics.html#schema.env-vars
+pub type EnvVars = HashMap<String, String>;
 // https://concourse-ci.org/config-basics.html#schema.version
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "lowercase")]

@@ -2,7 +2,7 @@ use crate::errors::Errors;
 use crate::pipeline::Pipeline;
 use crate::resource::Resource;
 use crate::resource::ResourceType;
-use crate::step::InParallelStep;
+use crate::step::InParallel;
 use crate::step::Step;
 use serde_yaml;
 use std::collections::HashMap;
@@ -33,13 +33,14 @@ fn collect_resource(
             resources.insert(get_step.resource().name(), get_step.resource().clone());
         }
         Step::InParallel(ref in_parallel) => match in_parallel {
-            InParallelStep::Steps(ref steps) => {
+            InParallel::Steps(ref steps) => {
                 for s in steps {
                     collect_resource(s, resources, resource_types)?;
                 }
             }
             _ => todo!(),
         },
+        Step::Task(_) => return Ok(()),
         _ => todo!(),
     }
     Ok(())

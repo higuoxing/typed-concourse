@@ -36,9 +36,9 @@ impl Pipeline {
         Ok(self)
     }
 
-    pub fn append(mut self, job: Job) -> Result<Self, Errors> {
+    pub fn append(mut self, job: Job) -> Self {
         self.jobs.push(job);
-        Ok(self)
+        self
     }
 
     pub fn jobs(&self) -> &Vec<Job> {

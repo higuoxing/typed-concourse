@@ -4,6 +4,7 @@ use typed_concourse::core::Version;
 use typed_concourse::job::Job;
 use typed_concourse::pipeline::Pipeline;
 use typed_concourse::resource::git_resource;
+use typed_concourse::step::Task;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let some_git_repo = git_resource(
@@ -19,12 +20,25 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
 
     let pipeline = Pipeline::new()
-        .append(Job::new("foo").parallel(&vec![
-            some_git_repo.get().trigger_new_build()?,
-            some_git_repo2.get().trigger_new_build()?.with_version(Version::Latest)?,
-            some_git_repo2.get_as("ts9").trigger_new_build()?.with_version(Version::Every)?,
-        ])?)?
-        .append(Job::new("bar"))?;
+        .append(
+            Job::new("foo")
+                .parallel(&vec![
+                    some_git_repo.as_get_resource().trigger_new_build().get(),
+                    some_git_repo2
+                        .as_get_resource()
+                        .trigger_new_build()
+                        .with_version(Version::Latest)
+                        .get(),
+                    some_git_repo2
+                        .as_get_resource()
+                        .trigger_new_build()
+                        .with_version(Version::Every)
+                        .get_as("ts2"),
+                ])
+                .then(some_git_repo.as_get_resource().get_as("gppkg2"))
+                .then(Task::linux().with_name("hello-world").to_step()),
+        )
+        .append(Job::new("bar").then(some_git_repo.as_get_resource().get()));
 
     match cook::cook_pipeline(&pipeline) {
         Ok(yaml) => println!("{}", yaml),
