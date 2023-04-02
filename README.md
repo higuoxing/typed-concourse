@@ -10,6 +10,10 @@
 
 - Intuitive API: The API for `typed-concourse` is designed to be intuitive and easy to use. Whether you're a seasoned Rust developer or new to the language, you'll be able to use `typed-concourse` to create your Concourse pipelines and tasks quickly and easily.
 
+## Problems that are not very easy to solve in other ways
+
+- Fly-without-push v.s. Push-without-fly: TODO.
+
 ## Getting started
 
 To use `typed-concourse` in your Rust project, simply add the following to your `Cargo.toml` file:

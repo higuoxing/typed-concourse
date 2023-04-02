@@ -1,9 +1,10 @@
+use crate::core::Identifier;
 use crate::errors::Errors;
-use crate::schema::Identifier;
+use crate::step::InParallelStep;
 use crate::step::Step;
 use serde::Serialize;
 
-#[derive(Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Job {
     name: Identifier,
     plan: Vec<Step>,
@@ -17,8 +18,18 @@ impl Job {
         }
     }
 
-    pub fn append(mut self, step: Step) -> Result<Self, Errors> {
+    pub fn then(mut self, step: Step) -> Result<Self, Errors> {
         self.plan.push(step);
         Ok(self)
+    }
+
+    pub fn parallel(mut self, steps: &Vec<Step>) -> Result<Self, Errors> {
+        self.plan
+            .push(Step::InParallel(InParallelStep::Steps(steps.clone())));
+        Ok(self)
+    }
+
+    pub fn plan(&self) -> &Vec<Step> {
+        &self.plan
     }
 }
