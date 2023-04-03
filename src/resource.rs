@@ -95,6 +95,14 @@ impl Resource {
         }
     }
 
+    pub fn registry_image() -> Self {
+        todo!()
+    }
+
+    pub fn docker_image() -> Self {
+        todo!()
+    }
+
     pub fn with_name(&self, name: &str) -> Self {
         let mut this = self.clone();
         this.name = name.to_string();
