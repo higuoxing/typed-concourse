@@ -1,4 +1,4 @@
-use crate::core::Identifier;
+use crate::schema::Identifier;
 use crate::step::InParallel;
 use crate::step::Step;
 use serde::Serialize;

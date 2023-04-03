@@ -1,23 +1,14 @@
 use std::error::Error;
 use typed_concourse::cook;
-use typed_concourse::core::Version;
 use typed_concourse::job::Job;
 use typed_concourse::pipeline::Pipeline;
-use typed_concourse::resource::git_resource;
-use typed_concourse::step::Task;
+use typed_concourse::resource::Resource;
+use typed_concourse::schema::Version;
+use typed_concourse::task::Task;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let some_git_repo = git_resource(
-        "gppkg",
-        "https://github.com/higuoxing/clang-plugins",
-        "main",
-    );
-
-    let some_git_repo2 = git_resource(
-        "timestamp9",
-        "https://github.com/higuoxing/timestamp9.git",
-        "master",
-    );
+    let some_git_repo = Resource::git("https://github.com/higuoxing/clang-plugins", "main");
+    let some_git_repo2 = Resource::git("https://github.com/higuoxing/timestamp9.git", "master");
 
     let pipeline = Pipeline::new()
         .append(

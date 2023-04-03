@@ -1,7 +1,7 @@
 use crate::errors::Errors;
 use crate::pipeline::Pipeline;
 use crate::resource::Resource;
-use crate::resource::ResourceType;
+use crate::resource::ResourceTypes;
 use crate::step::InParallel;
 use crate::step::Step;
 use serde_yaml;
@@ -20,16 +20,17 @@ fn check_pipeline(pipeline: &Pipeline) -> Result<(), Errors> {
 fn collect_resource(
     step: &Step,
     resources: &mut HashMap<String, Resource>,
-    resource_types: &mut HashMap<String, ResourceType>,
+    resource_types: &mut HashMap<String, ResourceTypes>,
 ) -> Result<(), Errors> {
     match step {
         Step::Get(ref get_step) => {
-            if get_step.resource().resource_type().type_() != String::from("core") {
+            if let ResourceTypes::Custom(_) = get_step.resource().resource_type().clone() {
                 resource_types.insert(
-                    get_step.resource().resource_type().name(),
+                    get_step.resource().resource_type().to_string(),
                     get_step.resource().resource_type().clone(),
                 );
             }
+
             resources.insert(get_step.resource().name(), get_step.resource().clone());
         }
         Step::InParallel(ref in_parallel) => match in_parallel {
@@ -59,8 +60,8 @@ fn initialize_resources(pipeline: &Pipeline) -> Result<Pipeline, Errors> {
     let resources = resources.iter().map(|(_, res)| res.clone()).collect();
     let resource_types = resource_types
         .iter()
-        .map(|(_, res_type)| res_type.clone())
-        .collect();
+        .map(|(_, v)| v.clone())
+        .collect::<Vec<ResourceTypes>>();
 
     let this = pipeline.clone();
     this.with_resources(resources)?

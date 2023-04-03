@@ -1,7 +1,9 @@
 pub mod cook;
-pub mod core;
 pub mod errors;
+pub mod get;
 pub mod job;
 pub mod pipeline;
 pub mod resource;
+pub mod schema;
 pub mod step;
+pub mod task;

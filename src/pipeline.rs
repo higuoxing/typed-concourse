@@ -1,7 +1,7 @@
 use crate::errors::Errors;
 use crate::job::Job;
 use crate::resource::Resource;
-use crate::resource::ResourceType;
+use crate::resource::ResourceTypes;
 use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]
@@ -11,7 +11,7 @@ pub struct Pipeline {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     resources: Vec<Resource>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    resource_types: Vec<ResourceType>,
+    resource_types: Vec<ResourceTypes>,
 }
 
 impl Pipeline {
@@ -30,7 +30,7 @@ impl Pipeline {
 
     pub fn with_resource_types(
         mut self,
-        resource_types: Vec<ResourceType>,
+        resource_types: Vec<ResourceTypes>,
     ) -> Result<Self, Errors> {
         self.resource_types = resource_types;
         Ok(self)

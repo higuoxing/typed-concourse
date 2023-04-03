@@ -10,9 +10,13 @@
 
 - Intuitive API: The API for `typed-concourse` is designed to be intuitive and easy to use. Whether you're a seasoned Rust developer or new to the language, you'll be able to use `typed-concourse` to create your Concourse pipelines and tasks quickly and easily.
 
-## Problems that are not very easy to solve in other ways
+## Problems that are not very easy to solve in plain YAYML or YAML generator.
 
 - Fly-without-push v.s. Push-without-fly: TODO.
+
+- Code indention: TODO.
+
+- Jump to resources/jobs/tasks definition: TODO.
 
 ## Getting started
 
@@ -26,28 +30,7 @@ typed-concourse = "0.1.0"
 Then, in your Rust code, you can use `typed-concourse` to define your Concourse configuration. For example, here's how you could define a simple pipeline:
 
 ```rust
-use std::error::Error;
-use typed_concourse::cook;
-use typed_concourse::job::Job;
-use typed_concourse::pipeline::Pipeline;
-use typed_concourse::step::Step;
-
-fn main() -> Result<(), Box<dyn Error>> {
-    let pipeline = Pipeline::new()
-        .append(
-            Job::new("foo")
-                .append(Step::get("res1").relabel("res11")?)?
-                .append(Step::put("res2"))?,
-        )?
-        .append(Job::new("bar"))?;
-
-    match cook::cook_pipeline(&pipeline) {
-        Ok(yaml) => println!("{}", yaml),
-        Err(e) => println!("{}", e),
-    }
-
-    Ok(())
-}
+[[TODO]]
 ```
 
 This creates a pipeline with a single job that runs a simple task to echo `"Hello, world!"`.
