@@ -2,6 +2,7 @@ use crate::get::Get;
 use crate::schema::Config;
 use crate::schema::Identifier;
 use crate::schema::Version;
+use crate::task::TaskResource;
 use serde::ser::SerializeStruct;
 use serde::Serialize;
 use serde::Serializer;
@@ -82,11 +83,11 @@ impl Resource {
 
     pub fn git(uri: &str, branch: &str) -> Self {
         Self {
-            name: uri
-                .split("/")
-                .last()
-                .expect("The given uri is not valid.")
-                .to_string(),
+            name: format!(
+                "{}.{}",
+                uri.split("/").last().expect("The given uri is not valid."),
+                branch
+            ),
             type_: ResourceTypes::Git,
             source: [("uri", uri), ("branch", branch)]
                 .iter()
@@ -128,6 +129,10 @@ impl Resource {
 
     pub fn as_get_resource(&self) -> Get {
         Get::from("", self, None)
+    }
+
+    pub fn as_task_input(&self) -> TaskResource {
+        TaskResource::Resource(self.clone())
     }
 }
 
@@ -213,6 +218,12 @@ impl TaskImageResource {
             params: None,
             version: None,
         }
+    }
+
+    pub fn with_tag(&self, tag: &str) -> Self {
+        let mut this = self.clone();
+        this.source.insert(String::from("tag"), tag.to_string());
+        this
     }
 
     pub fn with_source(&self, source: &Vec<(&str, &str)>) -> Self {

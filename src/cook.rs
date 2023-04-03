@@ -4,6 +4,7 @@ use crate::resource::Resource;
 use crate::resource::ResourceTypes;
 use crate::step::InParallel;
 use crate::step::Step;
+use crate::task::TaskResource;
 use serde_yaml;
 use std::collections::HashMap;
 
@@ -41,7 +42,16 @@ fn collect_resource(
             }
             _ => todo!(),
         },
-        Step::Task(_) => return Ok(()),
+        Step::Task(ref task) => match task.inputs() {
+            Some(ref inputs) => {
+                for inp in inputs {
+                    if let TaskResource::Resource(ref resource) = inp {
+                        resources.insert(resource.name(), resource.clone());
+                    }
+                }
+            }
+            None => {}
+        },
         _ => todo!(),
     }
     Ok(())
