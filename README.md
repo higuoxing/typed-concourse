@@ -1,5 +1,7 @@
 # Typed Concourse
 
+[![Build and Test](https://github.com/higuoxing/typed-concourse/actions/workflows/rust.yml/badge.svg)](https://github.com/higuoxing/typed-concourse/actions/workflows/rust.yml)
+
 > `typed-concourse` is a Rust library that allows users to write Concourse CI configuration in Rust.
 
 ## Features
