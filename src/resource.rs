@@ -76,7 +76,9 @@ impl Serialize for Resource {
         if self.icon.is_some() {
             state.serialize_field("icon", &self.icon)?;
         }
-        state.serialize_field("source", &self.source)?;
+        if !self.source.is_empty() {
+            state.serialize_field("source", &self.source)?;
+        }
         state.end()
     }
 }

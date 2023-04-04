@@ -3,8 +3,16 @@ use crate::step::InParallel;
 use crate::step::Step;
 use serde::Serialize;
 
+#[derive(Debug, Clone)]
+enum JobKind {
+    Unbound,
+    Initialized,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct Job {
+    #[serde(skip_serializing)]
+    kind: JobKind,
     name: Identifier,
     #[serde(skip_serializing_if = "Option::is_none")]
     public: Option<bool>,
@@ -24,8 +32,15 @@ pub struct Job {
 }
 
 impl Job {
+    pub fn unbound() -> Self {
+        let mut this = Self::new("");
+        this.kind = JobKind::Unbound;
+        this
+    }
+
     pub fn new(name: &str) -> Self {
         Self {
+            kind: JobKind::Initialized,
             name: name.to_string(),
             public: None,
             serial: None,
@@ -126,6 +141,11 @@ impl Job {
 
     pub fn plan(&self) -> &Vec<Step> {
         &self.plan
+    }
+
+    pub fn bind(self, var: &mut Self) -> Self {
+        *var = self.clone();
+        self
     }
 
     pub(crate) fn reset_plan(&mut self) {

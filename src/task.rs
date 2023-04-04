@@ -158,14 +158,14 @@ impl TaskConfig {
 
 #[derive(Debug, Clone)]
 pub enum TaskResource {
-    Uninitialized,
+    Unbound,
     Resource(Resource),
     Output(Identifier),
 }
 
 impl TaskResource {
-    pub fn default() -> Self {
-        Self::Uninitialized
+    pub fn unbound() -> Self {
+        Self::Unbound
     }
 
     pub fn output(identifier: &str) -> Self {
