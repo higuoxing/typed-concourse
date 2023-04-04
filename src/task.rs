@@ -1,5 +1,6 @@
 use crate::resource::Resource;
 use crate::resource::TaskImageResource;
+use crate::schema::DirPath;
 use crate::schema::EnvVars;
 use crate::schema::FilePath;
 use crate::schema::Identifier;
@@ -44,18 +45,46 @@ fn boolean_is_false(b: &bool) -> bool {
 pub struct Input {
     name: Identifier,
     #[serde(skip_serializing_if = "Option::is_none")]
-    path: Option<String>,
+    path: Option<DirPath>,
     #[serde(skip_serializing_if = "boolean_is_false")]
     optional: bool,
 }
 
 impl Input {
-    pub fn from(name: &str) -> Self {
+    pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
             path: None,
             optional: false,
         }
+    }
+
+    pub fn with_path(&self, path: &str) -> Self {
+        let mut this = self.clone();
+        this.path = Some(path.to_string());
+        this
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct Output {
+    name: Identifier,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    path: Option<DirPath>,
+}
+
+impl Output {
+    pub fn new(name: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            path: None,
+        }
+    }
+
+    pub fn with_path(&self, path: &str) -> Self {
+        let mut this = self.clone();
+        this.path = Some(path.to_string());
+        this
     }
 }
 
@@ -69,7 +98,7 @@ pub struct TaskConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) inputs: Option<Vec<Input>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    outputs: Option<Vec<Identifier>>,
+    outputs: Option<Vec<Output>>,
 }
 
 impl TaskConfig {
@@ -117,6 +146,12 @@ impl TaskConfig {
     pub fn with_inputs(&self, inputs: Vec<Input>) -> Self {
         let mut this = self.clone();
         this.inputs = Some(inputs);
+        this
+    }
+
+    pub fn with_outputs(&self, outputs: Vec<Output>) -> Self {
+        let mut this = self.clone();
+        this.outputs = Some(outputs);
         this
     }
 

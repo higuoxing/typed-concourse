@@ -6,6 +6,8 @@ use serde::Serialize;
 pub type Identifier = String;
 // https://concourse-ci.org/config-basics.html#schema.file-path
 pub type FilePath = String;
+// https://concourse-ci.org/config-basics.html#schema.dir-path
+pub type DirPath = String;
 // https://concourse-ci.org/config-basics.html#schema.config
 pub type Config = HashMap<String, String>;
 // https://concourse-ci.org/config-basics.html#schema.env-vars

@@ -85,15 +85,13 @@ fn collect_resource_used_in_task(step: &Step) -> Result<(Option<Vec<Resource>>, 
                                     inputs.append(
                                         &mut res
                                             .iter()
-                                            .map(|r| Input::from(r.name().as_str()))
+                                            .map(|r| Input::new(r.name().as_str()))
                                             .collect(),
                                     );
                                 }
                                 None => {
                                     task_config.inputs = Some(
-                                        res.iter()
-                                            .map(|r| Input::from(r.name().as_str()))
-                                            .collect(),
+                                        res.iter().map(|r| Input::new(r.name().as_str())).collect(),
                                     );
                                 }
                             },
