@@ -12,9 +12,10 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "kebab-case")]
 pub enum ResourceTypes {
+    DockerImage,
     Git,
     RegistryImage,
-    DockerImage,
+    Time,
     Custom(String),
 }
 
@@ -24,6 +25,7 @@ impl ResourceTypes {
             Self::Git => String::from("git"),
             Self::RegistryImage => String::from("registry-image"),
             Self::DockerImage => String::from("docker-image"),
+            Self::Time => String::from("time"),
             Self::Custom(ref custom) => custom.clone(),
         }
     }
@@ -33,6 +35,7 @@ impl ResourceTypes {
             "git" => Self::Git,
             "registry-image" => Self::RegistryImage,
             "docker-image" => Self::DockerImage,
+            "time" => Self::Time,
             custom => Self::Custom(custom.to_string()),
         }
     }
@@ -59,15 +62,20 @@ impl ResourceType {
 #[derive(Debug, Clone)]
 pub struct Resource {
     name: Identifier,
+    icon: Option<String>,
     type_: ResourceTypes,
     source: Config,
+    trigger: bool,
 }
 
 impl Serialize for Resource {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut state = serializer.serialize_struct("Resource", 3)?;
+        let mut state = serializer.serialize_struct("Resource", 4)?;
         state.serialize_field("name", &self.name)?;
         state.serialize_field("type", &self.type_)?;
+        if self.icon.is_some() {
+            state.serialize_field("icon", &self.icon)?;
+        }
         state.serialize_field("source", &self.source)?;
         state.end()
     }
@@ -77,21 +85,58 @@ impl Resource {
     pub fn new(name: &str, res_type: ResourceTypes) -> Self {
         Self {
             name: name.to_string(),
+            icon: None,
             type_: res_type,
             source: HashMap::new(),
+            trigger: false,
         }
+    }
+
+    pub(crate) fn trigger(&self) -> bool {
+        self.trigger
     }
 
     pub fn git(uri: &str, branch: &str) -> Self {
         let git_url = GitUrl::parse(uri)
             .expect(format!("The URI of given git resource '{}' is not valid", uri).as_str());
+
+        let mut source = HashMap::new();
+        source.insert(String::from("uri"), uri.to_string());
+        if branch != "" {
+            source.insert(String::from("branch"), branch.to_string());
+        }
+
+        let name = if branch == "" {
+            git_url.name
+        } else {
+            format!("{}.{}", git_url.name, branch)
+        };
+
         Self {
-            name: format!("{}.{}", git_url.name, branch),
+            name,
             type_: ResourceTypes::Git,
-            source: [("uri", uri), ("branch", branch)]
+            icon: if uri.contains("github") {
+                Some(String::from("github"))
+            } else if uri.contains("gitlab") {
+                Some(String::from("gitlab"))
+            } else {
+                None
+            },
+            source,
+            trigger: false,
+        }
+    }
+
+    pub fn time(interval: &str) -> Self {
+        Self {
+            name: format!("every-{}", interval),
+            type_: ResourceTypes::Time,
+            icon: Some(String::from("clock-outline")),
+            source: [("interval", interval)]
                 .iter()
                 .map(|(k, v)| (k.to_string(), v.to_string()))
                 .collect(),
+            trigger: false,
         }
     }
 
@@ -106,6 +151,24 @@ impl Resource {
     pub fn with_name(&self, name: &str) -> Self {
         let mut this = self.clone();
         this.name = name.to_string();
+        this
+    }
+
+    pub fn with_icon(&self, icon: &str) -> Self {
+        let mut this = self.clone();
+
+        this.icon = if icon == "" {
+            None
+        } else {
+            Some(icon.to_string())
+        };
+
+        this
+    }
+
+    pub fn with_trigger(&self, trigger: bool) -> Self {
+        let mut this = self.clone();
+        this.trigger = trigger;
         this
     }
 

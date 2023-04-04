@@ -43,7 +43,7 @@ impl Get {
             get: identifier.to_string(),
             resource: resource.clone(),
             version,
-            trigger: false,
+            trigger: resource.trigger(),
         }
     }
 
@@ -52,9 +52,10 @@ impl Get {
         self
     }
 
-    pub fn trigger_new_build(mut self) -> Self {
-        self.trigger = true;
-        self
+    pub fn with_trigger(&self, trigger: bool) -> Self {
+        let mut this = self.clone();
+        this.trigger = trigger;
+        this
     }
 
     pub fn resource(&self) -> &Resource {

@@ -154,10 +154,6 @@ impl TaskConfig {
         this.outputs = Some(outputs);
         this
     }
-
-    pub(crate) fn inputs_mut(&mut self) -> Option<&mut Vec<Input>> {
-        self.inputs.as_mut()
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -180,10 +176,7 @@ impl TaskResource {
 #[derive(Debug, Clone, Serialize)]
 pub struct Task {
     task: Identifier,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    config: Option<TaskConfig>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    file: Option<FilePath>,
+    config: TaskConfig,
     #[serde(skip_serializing_if = "Option::is_none")]
     image: Option<Identifier>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -196,35 +189,28 @@ pub struct Task {
     inputs: Option<Vec<TaskResource>>,
     #[serde(skip_serializing)]
     outputs: Option<Vec<TaskResource>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    on_failure: Option<Box<Step>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    on_abort: Option<Box<Step>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    on_success: Option<Box<Step>>,
 }
 
 impl Task {
-    pub fn from_file(identifier: &str, file: &str) -> Self {
-        Self {
-            task: identifier.to_string(),
-            config: None,
-            file: Some(file.to_string()),
-            image: None,
-            params: None,
-            input_mapping: None,
-            output_mapping: None,
-            inputs: None,
-            outputs: None,
-        }
-    }
-
     pub fn linux() -> Task {
-        let task_config = TaskConfig::linux_default();
         Self {
             task: Generator::default().next().unwrap(),
-            config: Some(task_config),
-            file: None,
+            config: TaskConfig::linux_default(),
             image: None,
             params: None,
             input_mapping: None,
             output_mapping: None,
             inputs: None,
             outputs: None,
+            on_abort: None,
+            on_failure: None,
+            on_success: None,
         }
     }
 
@@ -234,20 +220,16 @@ impl Task {
         this
     }
 
+    pub fn run(&self, command: &Command) -> Self {
+        let mut this = self.clone();
+        this.config.run = command.clone();
+        this
+    }
+
     pub fn with_image_resource(&self, image_resource: TaskImageResource) -> Self {
         let mut this = self.clone();
-        match this.config {
-            Some(mut config) => {
-                config.image_resource = image_resource;
-                this.config = Some(config);
-                this
-            }
-            None => {
-                panic!(
-                    "with_image_resource() cannot be used with 'task's instantiated from 'file'."
-                )
-            }
-        }
+        this.config.image_resource = image_resource;
+        this
     }
 
     pub fn with_params(&self, params: &Vec<(&str, &str)>) -> Self {
@@ -329,8 +311,8 @@ impl Task {
         &self.inputs
     }
 
-    pub(crate) fn task_config_mut(&mut self) -> Option<&mut TaskConfig> {
-        self.config.as_mut()
+    pub(crate) fn task_config_mut(&mut self) -> &mut TaskConfig {
+        &mut self.config
     }
 
     pub fn mutate_task_config<F: Fn(&TaskConfig) -> TaskConfig>(
@@ -338,19 +320,30 @@ impl Task {
         task_config_mutator: F,
     ) -> Self {
         let mut this = self.clone();
-        let config = this.config.expect(
-            format!(
-                "Task '{}' is not initialized from TaskConfig",
-                self.task.as_str()
-            )
-            .as_str(),
-        );
-
-        this.config = Some(task_config_mutator(&config));
+        let config = this.config;
+        this.config = task_config_mutator(&config);
         this
     }
 
     pub fn to_step(&self) -> Step {
         Step::Task(self.clone())
+    }
+
+    pub fn on_failure(&self, step: Step) -> Self {
+        let mut this = self.clone();
+        this.on_failure = Some(Box::new(step));
+        this
+    }
+
+    pub fn on_abort(&self, step: Step) -> Self {
+        let mut this = self.clone();
+        this.on_abort = Some(Box::new(step));
+        this
+    }
+
+    pub fn on_success(&self, step: Step) -> Self {
+        let mut this = self.clone();
+        this.on_success = Some(Box::new(step));
+        this
     }
 }

@@ -6,6 +6,10 @@ use serde::Serialize;
 #[derive(Debug, Clone, Serialize)]
 pub struct Job {
     name: Identifier,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    public: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    serial: Option<bool>,
     plan: Vec<Step>,
     #[serde(skip_serializing_if = "Option::is_none")]
     on_failure: Option<Step>,
@@ -23,6 +27,8 @@ impl Job {
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
+            public: None,
+            serial: None,
             plan: vec![],
             on_failure: None,
             on_error: None,
@@ -43,6 +49,18 @@ impl Job {
 
     pub fn name(&self) -> String {
         self.name.clone()
+    }
+
+    pub fn with_public(&self, is_public: bool) -> Self {
+        let mut this = self.clone();
+        this.public = Some(is_public);
+        this
+    }
+
+    pub fn with_serial(&self, is_serial: bool) -> Self {
+        let mut this = self.clone();
+        this.serial = Some(is_serial);
+        this
     }
 
     pub fn then(&self, step: Step) -> Self {

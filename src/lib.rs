@@ -7,3 +7,6 @@ pub mod resource;
 pub mod schema;
 pub mod step;
 pub mod task;
+
+#[cfg(test)]
+mod examples;

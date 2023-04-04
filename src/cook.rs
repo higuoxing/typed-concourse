@@ -79,23 +79,20 @@ fn collect_resource_used_in_task(step: &Step) -> Result<(Option<Vec<Resource>>, 
                     Some(res) => {
                         // Mutate the task to add 'inputs' tags into its config.
                         let mut task = task.clone();
-                        match task.task_config_mut() {
-                            Some(ref mut task_config) => match task_config.inputs_mut() {
-                                Some(ref mut inputs) => {
-                                    inputs.append(
-                                        &mut res
-                                            .iter()
-                                            .map(|r| Input::new(r.name().as_str()))
-                                            .collect(),
-                                    );
-                                }
-                                None => {
-                                    task_config.inputs = Some(
-                                        res.iter().map(|r| Input::new(r.name().as_str())).collect(),
-                                    );
-                                }
-                            },
-                            None => return Err(Errors::from("TODO")),
+                        match task.task_config_mut().inputs {
+                            Some(ref mut inputs) => {
+                                inputs.append(
+                                    &mut res
+                                        .iter()
+                                        .map(|r| Input::new(r.name().as_str()))
+                                        .collect(),
+                                );
+                            }
+                            None => {
+                                task.task_config_mut().inputs = Some(
+                                    res.iter().map(|r| Input::new(r.name().as_str())).collect(),
+                                );
+                            }
                         }
                         return Ok((resources, Step::Task(task)));
                     }
@@ -111,7 +108,8 @@ fn collect_resource_used_in_task(step: &Step) -> Result<(Option<Vec<Resource>>, 
 }
 
 fn optimize_pipeline(pipeline: &Pipeline) -> Result<Pipeline, Errors> {
-    let mut new_pipeline = Pipeline::new();
+    let mut new_pipeline = pipeline.clone();
+    new_pipeline.jobs = vec![];
 
     for job in pipeline.jobs() {
         let mut new_job = job.clone();
@@ -157,9 +155,9 @@ fn collect_resources(pipeline: &Pipeline) -> Result<Pipeline, Errors> {
         .map(|(_, v)| v.clone())
         .collect::<Vec<ResourceTypes>>();
 
-    let this = pipeline.clone();
-    this.with_resources(resources)?
-        .with_resource_types(resource_types)
+    Ok(pipeline
+        .with_resources(resources)
+        .with_resource_types(resource_types))
 }
 
 pub fn cook_pipeline(pipeline: &Pipeline) -> Result<String, Errors> {
