@@ -203,7 +203,7 @@ resources:
             Job::new("job").then(
                 Task::linux()
                     .with_name("list-files")
-                    .with_input(&concourse_docs_git.as_task_input())
+                    .with_input(&concourse_docs_git.as_task_resource())
                     .mutate_task_config(|task_confg| {
                         task_confg.run(&Command::new("ls", &vec!["./concourse-docs-git"]))
                     })

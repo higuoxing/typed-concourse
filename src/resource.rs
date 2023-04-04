@@ -195,7 +195,7 @@ impl Resource {
         Get::from("", self, None)
     }
 
-    pub fn as_task_input(&self) -> TaskResource {
+    pub fn as_task_resource(&self) -> TaskResource {
         TaskResource::Resource(self.clone())
     }
 }
