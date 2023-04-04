@@ -3,6 +3,7 @@ use crate::schema::Config;
 use crate::schema::Identifier;
 use crate::schema::Version;
 use crate::task::TaskResource;
+use git_url_parse::GitUrl;
 use serde::ser::SerializeStruct;
 use serde::Serialize;
 use serde::Serializer;
@@ -82,12 +83,10 @@ impl Resource {
     }
 
     pub fn git(uri: &str, branch: &str) -> Self {
+        let git_url = GitUrl::parse(uri)
+            .expect(format!("The URI of given git resource '{}' is not valid", uri).as_str());
         Self {
-            name: format!(
-                "{}.{}",
-                uri.split("/").last().expect("The given uri is not valid."),
-                branch
-            ),
+            name: format!("{}.{}", git_url.name, branch),
             type_: ResourceTypes::Git,
             source: [("uri", uri), ("branch", branch)]
                 .iter()

@@ -41,6 +41,10 @@ impl Job {
         Self::new(name).fallible(on_failure, on_error, on_abort)
     }
 
+    pub fn name(&self) -> String {
+        self.name.clone()
+    }
+
     pub fn then(&self, step: Step) -> Self {
         let mut this = self.clone();
         this.plan.push(step);
@@ -104,5 +108,9 @@ impl Job {
 
     pub fn plan(&self) -> &Vec<Step> {
         &self.plan
+    }
+
+    pub(crate) fn reset_plan(&mut self) {
+        self.plan = vec![];
     }
 }

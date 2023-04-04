@@ -36,6 +36,29 @@ impl Command {
     }
 }
 
+fn boolean_is_false(b: &bool) -> bool {
+    *b == false
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct Input {
+    name: Identifier,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    path: Option<String>,
+    #[serde(skip_serializing_if = "boolean_is_false")]
+    optional: bool,
+}
+
+impl Input {
+    pub fn from(name: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            path: None,
+            optional: false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct TaskConfig {
     platform: Platform,
@@ -44,7 +67,7 @@ pub struct TaskConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     params: Option<EnvVars>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    inputs: Option<Vec<Identifier>>,
+    pub(crate) inputs: Option<Vec<Input>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     outputs: Option<Vec<Identifier>>,
 }
@@ -67,6 +90,38 @@ impl TaskConfig {
 
     pub fn darwin_default() -> Self {
         todo!("Generating default config for Darwin platform")
+    }
+
+    pub fn with_image_resource(&self, image_resource: &TaskImageResource) -> Self {
+        let mut this = self.clone();
+        this.image_resource = image_resource.clone();
+        this
+    }
+
+    pub fn run(&self, command: &Command) -> Self {
+        let mut this = self.clone();
+        this.run = command.clone();
+        this
+    }
+
+    pub fn with_env(&self, env: &Vec<(&str, &str)>) -> Self {
+        let mut this = self.clone();
+        this.params = Some(
+            env.iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+        );
+        this
+    }
+
+    pub fn with_inputs(&self, inputs: Vec<Input>) -> Self {
+        let mut this = self.clone();
+        this.inputs = Some(inputs);
+        this
+    }
+
+    pub(crate) fn inputs_mut(&mut self) -> Option<&mut Vec<Input>> {
+        self.inputs.as_mut()
     }
 }
 
@@ -237,6 +292,27 @@ impl Task {
 
     pub fn inputs(&self) -> &Option<Vec<TaskResource>> {
         &self.inputs
+    }
+
+    pub(crate) fn task_config_mut(&mut self) -> Option<&mut TaskConfig> {
+        self.config.as_mut()
+    }
+
+    pub fn mutate_task_config<F: Fn(&TaskConfig) -> TaskConfig>(
+        &self,
+        task_config_mutator: F,
+    ) -> Self {
+        let mut this = self.clone();
+        let config = this.config.expect(
+            format!(
+                "Task '{}' is not initialized from TaskConfig",
+                self.task.as_str()
+            )
+            .as_str(),
+        );
+
+        this.config = Some(task_config_mutator(&config));
+        this
     }
 
     pub fn to_step(&self) -> Step {
