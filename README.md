@@ -1,8 +1,8 @@
-# Typed Concourse
+# Typed Concourse [![Build and Test](https://github.com/higuoxing/typed-concourse/actions/workflows/rust.yml/badge.svg)](https://github.com/higuoxing/typed-concourse/actions/workflows/rust.yml)
 
-[![Build and Test](https://github.com/higuoxing/typed-concourse/actions/workflows/rust.yml/badge.svg)](https://github.com/higuoxing/typed-concourse/actions/workflows/rust.yml)
+> `typed-concourse` is a Rust library that allows users to write [Concourse CI](https://concourse-ci.org/) configuration in Rust.
 
-> `typed-concourse` is a Rust library that allows users to write Concourse CI configuration in Rust.
+<img src=".github/assets/typed-concourse.png" width="300">
 
 ## Features
 
@@ -37,7 +37,7 @@ Then, in your Rust code, you can use `typed-concourse` to define your Concourse 
 
 This creates a pipeline with a single job that runs a simple task to echo `"Hello, world!"`.
 
-For more examples and documentation, please see the API documentation.
+For more examples and documentation, please refer to the [`src/example.rs`](https://github.com/higuoxing/typed-concourse/blob/main/src/examples.rs) and [API documentation](TODO).
 
 ## Contributing
 
