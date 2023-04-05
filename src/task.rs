@@ -6,10 +6,12 @@ use crate::schema::FilePath;
 use crate::schema::Identifier;
 use crate::step::Step;
 use names::Generator;
+use serde::ser::SerializeStruct;
 use serde::Serialize;
+use serde::Serializer;
 use std::collections::HashMap;
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Copy, Clone, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Platform {
     Linux,
@@ -88,24 +90,41 @@ impl Output {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
 pub struct TaskConfig {
     platform: Platform,
     image_resource: TaskImageResource,
     run: Command,
-    #[serde(skip_serializing_if = "Option::is_none")]
     params: Option<EnvVars>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) inputs: Option<Vec<Input>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     outputs: Option<Vec<Output>>,
+}
+
+impl Serialize for TaskConfig {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut state = serializer.serialize_struct("TaskConfig", 6)?;
+        state.serialize_field("platform", &self.platform)?;
+        let anonymouse_resource = self.image_resource.to_anonymouse_resource();
+        state.serialize_field("image_resource", &anonymouse_resource)?;
+        state.serialize_field("run", &self.run)?;
+        if self.params.is_some() {
+            state.serialize_field("params", &self.params)?;
+        }
+        if self.inputs.is_some() {
+            state.serialize_field("inputs", &self.inputs)?;
+        }
+        if self.outputs.is_some() {
+            state.serialize_field("inputs", &self.outputs)?;
+        }
+        state.end()
+    }
 }
 
 impl TaskConfig {
     pub fn linux_default() -> Self {
         Self {
             platform: Platform::Linux,
-            image_resource: TaskImageResource::registry_image("busybox"),
+            image_resource: Resource::registry_image("busybox").as_task_image_resource(),
             run: Command::new("echo", &vec!["hello, world!"]),
             params: None,
             inputs: None,
@@ -119,6 +138,12 @@ impl TaskConfig {
 
     pub fn darwin_default() -> Self {
         todo!("Generating default config for Darwin platform")
+    }
+
+    pub fn with_platform(&self, platform: Platform) -> Self {
+        let mut this = self.clone();
+        this.platform = platform;
+        this
     }
 
     pub fn with_image_resource(&self, image_resource: &TaskImageResource) -> Self {
@@ -179,34 +204,54 @@ enum TaskKind {
     FromFile,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
 pub struct Task {
-    #[serde(skip_serializing)]
     kind: TaskKind,
     task: Identifier,
     config: TaskConfig,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    image: Option<Identifier>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    image: Option<TaskImageResource>,
     params: Option<EnvVars>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     input_mapping: Option<HashMap<String, String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     output_mapping: Option<HashMap<String, String>>,
-    #[serde(skip_serializing)]
+    // Inputs shouldn't be serialized!!
     inputs: Option<Vec<TaskResource>>,
-    #[serde(skip_serializing)]
+    // Outputs shouldn't be serialized!!
     outputs: Option<Vec<TaskResource>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     on_failure: Option<Box<Step>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     on_abort: Option<Box<Step>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     on_success: Option<Box<Step>>,
 }
 
+impl Serialize for Task {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut state = serializer.serialize_struct("Task", 6)?;
+        state.serialize_field("task", &self.task)?;
+        state.serialize_field("config", &self.config)?;
+        if self.params.is_some() {
+            state.serialize_field("params", &self.params)?;
+        }
+        if self.input_mapping.is_some() {
+            state.serialize_field("input_mapping", &self.input_mapping)?;
+        }
+        if self.output_mapping.is_some() {
+            state.serialize_field("output_mapping", &self.input_mapping)?;
+        }
+        if self.on_failure.is_some() {
+            state.serialize_field("on_failure", &self.on_failure)?;
+        }
+        if self.on_abort.is_some() {
+            state.serialize_field("on_abort", &self.on_abort)?;
+        }
+        if self.on_success.is_some() {
+            state.serialize_field("on_success", &self.on_success)?;
+        }
+
+        state.end()
+    }
+}
+
 impl Task {
-    pub fn linux() -> Task {
+    pub fn new() -> Task {
         Self {
             kind: TaskKind::FromConfig,
             task: Generator::default().next().unwrap(),
@@ -221,6 +266,12 @@ impl Task {
             on_failure: None,
             on_success: None,
         }
+    }
+
+    pub fn with_platform(&self, platform: Platform) -> Self {
+        let mut this = self.clone();
+        this = this.mutate_task_config(|task_config| task_config.with_platform(platform));
+        this
     }
 
     pub fn with_name(&self, name: &str) -> Self {
@@ -238,6 +289,11 @@ impl Task {
         }
         let mut this = self.clone();
         this.config.run = command.clone();
+        this
+    }
+
+    pub fn with_image(&self) -> Self {
+        let this = self.clone();
         this
     }
 

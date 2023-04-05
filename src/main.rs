@@ -8,15 +8,19 @@ use typed_concourse::task::{Command, Task};
 fn main() -> Result<(), Box<dyn Error>> {
     let some_git_repo = Resource::git("https://github.com/greenplum-db/gpdb", "main");
 
-    let pipeline = Pipeline::new().append(
-        Job::new("foo").then(
-            Task::linux()
-                .with_name("hello-world")
-                .with_input(&some_git_repo.as_task_resource())
-                .run(&Command::new("echo", &vec!["hello, world"]))
-                .to_step(),
-        ),
-    );
+    let pipeline = Pipeline::new()
+        .with_background(
+            "https://raw.githubusercontent.com/greenplum-db/gpdb/main/logo-greenplum.svg",
+        )
+        .append(
+            Job::new("foo").then(
+                Task::new()
+                    .with_name("hello-world")
+                    .with_input(&some_git_repo.as_task_input_resource())
+                    .run(&Command::new("echo", &vec!["hello, world"]))
+                    .to_step(),
+            ),
+        );
 
     match cook::cook_pipeline(&pipeline) {
         Ok(yaml) => println!("{}", yaml),

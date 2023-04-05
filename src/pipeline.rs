@@ -4,7 +4,14 @@ use crate::resource::ResourceTypes;
 use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]
+struct DisplayConfig {
+    background_image: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct Pipeline {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    display: Option<DisplayConfig>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) jobs: Vec<Job>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -16,10 +23,19 @@ pub struct Pipeline {
 impl Pipeline {
     pub fn new() -> Self {
         Self {
+            display: None,
             jobs: vec![],
             resources: vec![],
             resource_types: vec![],
         }
+    }
+
+    pub fn with_background(&self, uri: &str) -> Self {
+        let mut this = self.clone();
+        this.display = Some(DisplayConfig {
+            background_image: uri.to_string(),
+        });
+        this
     }
 
     pub fn with_resources(&self, resources: Vec<Resource>) -> Self {

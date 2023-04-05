@@ -4,7 +4,7 @@ mod examples {
         cook::{self, cook_pipeline},
         job::Job,
         pipeline::Pipeline,
-        resource::{Resource, TaskImageResource},
+        resource::Resource,
         task::{Command, Task},
     };
 
@@ -13,9 +13,8 @@ mod examples {
     fn hello_world_example() {
         let pipeline = Pipeline::new().append(
             Job::new("job").with_public(true).then(
-                Task::linux()
+                Task::new()
                     .with_name("simple-task")
-                    .with_image_resource(TaskImageResource::registry_image("busybox"))
                     .mutate_task_config(|task_config| {
                         task_config.run(&Command::new("echo", &vec!["Hello world!"]))
                     })
@@ -49,9 +48,8 @@ mod examples {
     fn serial_job_example() {
         let pipeline = Pipeline::new().append(
             Job::new("job").with_public(true).with_serial(true).then(
-                Task::linux()
+                Task::new()
                     .with_name("simple-task")
-                    .with_image_resource(TaskImageResource::registry_image("busybox"))
                     .mutate_task_config(|task_config| {
                         task_config.run(&Command::new("echo", &vec!["Hello world!"]))
                     })
@@ -89,23 +87,17 @@ mod examples {
         let pipeline = Pipeline::new()
             .append(
                 Job::new("((first))-job").with_public(true).then(
-                    Task::linux()
+                    Task::new()
                         .with_name("simple-task")
-                        .with_image_resource(TaskImageResource::registry_image("busybox"))
-                        .mutate_task_config(|task_config| {
-                            task_config.run(&Command::new("echo", &vec!["Hello, ((hello))!"]))
-                        })
+                        .run(&Command::new("echo", &vec!["Hello, ((hello))!"]))
                         .to_step(),
                 ),
             )
             .append(
                 Job::new("level-((number))-job").with_public(true).then(
-                    Task::linux()
+                    Task::new()
                         .with_name("simple-task")
-                        .with_image_resource(TaskImageResource::registry_image("busybox"))
-                        .mutate_task_config(|task_config| {
-                            task_config.run(&Command::new("echo", &vec!["Hello, ((hello))!"]))
-                        })
+                        .run(&Command::new("echo", &vec!["Hello, ((hello))!"]))
                         .to_step(),
                 ),
             );
@@ -154,12 +146,9 @@ mod examples {
                 .with_public(true)
                 .then(every_30s.as_get_resource().with_trigger(true).get())
                 .then(
-                    Task::linux()
+                    Task::new()
                         .with_name("simple-task")
-                        .with_image_resource(TaskImageResource::registry_image("busybox"))
-                        .mutate_task_config(|task_config| {
-                            task_config.run(&Command::new("echo", &vec!["Hello, world!"]))
-                        })
+                        .run(&Command::new("echo", &vec!["Hello, world!"]))
                         .to_step(),
                 ),
         );
@@ -201,12 +190,10 @@ resources:
             .with_trigger(true);
         let pipeline = Pipeline::new().append(
             Job::new("job").then(
-                Task::linux()
+                Task::new()
                     .with_name("list-files")
-                    .with_input(&concourse_docs_git.as_task_resource())
-                    .mutate_task_config(|task_confg| {
-                        task_confg.run(&Command::new("ls", &vec!["./concourse-docs-git"]))
-                    })
+                    .with_input(&concourse_docs_git.as_task_input_resource())
+                    .run(&Command::new("ls", &vec!["./concourse-docs-git"]))
                     .to_step(),
             ),
         );
@@ -256,35 +243,35 @@ resources:
             Job::new("job")
                 .with_public(true)
                 .on_success(
-                    Task::linux()
+                    Task::new()
                         .with_name("job-success")
                         .run(&echo("job", "succeeded"))
                         .to_step(),
                 )
                 .on_error(
-                    Task::linux()
+                    Task::new()
                         .with_name("job-failure")
                         .run(&echo("job", "failed"))
                         .to_step(),
                 )
                 .on_abort(
-                    Task::linux()
+                    Task::new()
                         .with_name("job-aborted")
                         .run(&echo("job", "aborted"))
                         .to_step(),
                 )
                 .then(
-                    Task::linux()
+                    Task::new()
                         .with_name("successful-task")
                         .run(&Command::new("sh", &vec!["-lc", "exit 0"]))
                         .on_success(
-                            Task::linux()
+                            Task::new()
                                 .with_name("task-success")
                                 .run(&echo("task", "succeeded"))
                                 .to_step(),
                         )
                         .on_abort(
-                            Task::linux()
+                            Task::new()
                                 .with_name("task-aborted")
                                 .run(&echo("task", "aborted"))
                                 .to_step(),
@@ -292,11 +279,11 @@ resources:
                         .to_step(),
                 )
                 .then(
-                    Task::linux()
+                    Task::new()
                         .with_name("failing-task")
                         .run(&Command::new("sh", &vec!["-lc", "exit 1"]))
                         .on_failure(
-                            Task::linux()
+                            Task::new()
                                 .with_name("task-failure")
                                 .run(&echo("task", "failed"))
                                 .to_step(),

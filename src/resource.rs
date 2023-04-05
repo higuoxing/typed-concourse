@@ -16,7 +16,14 @@ pub enum ResourceTypes {
     Git,
     RegistryImage,
     Time,
-    Custom(String),
+    Custom {
+        name: String,
+        type_: Box<ResourceTypes>,
+        #[serde(skip_serializing_if = "HashMap::is_empty")]
+        source: Config,
+        #[serde(skip_serializing_if = "HashMap::is_empty")]
+        params: Config,
+    },
 }
 
 impl ResourceTypes {
@@ -26,36 +33,73 @@ impl ResourceTypes {
             Self::RegistryImage => String::from("registry-image"),
             Self::DockerImage => String::from("docker-image"),
             Self::Time => String::from("time"),
-            Self::Custom(ref custom) => custom.clone(),
+            Self::Custom { ref name, .. } => name.clone(),
         }
     }
 
-    pub fn from(resource_type: &str) -> Self {
-        match resource_type {
-            "git" => Self::Git,
-            "registry-image" => Self::RegistryImage,
-            "docker-image" => Self::DockerImage,
-            "time" => Self::Time,
-            custom => Self::Custom(custom.to_string()),
+    pub fn new(name: &str, type_: ResourceTypes) -> Self {
+        Self::Custom {
+            name: name.to_string(),
+            type_: Box::new(type_),
+            source: HashMap::new(),
+            params: HashMap::new(),
         }
     }
-}
 
-#[derive(Debug, Clone, Serialize)]
-pub struct ResourceType {
-    name: Identifier,
-    #[serde(rename(serialize = "type"))]
-    type_: ResourceTypes,
-    source: Config,
-}
+    pub fn with_source(&self, new_source: &Vec<(&str, &str)>) -> Self {
+        match self {
+            Self::Custom {
+                ref name,
+                ref type_,
+                ref source,
+                ref params,
+            } => {
+                let mut source = source.clone();
+                new_source
+                    .iter()
+                    .map(|(k, v)| source.insert(k.to_string(), v.to_string()))
+                    .count();
 
-impl ResourceType {
-    pub fn name(&self) -> Identifier {
-        self.name.clone()
+                Self::Custom {
+                    name: name.clone(),
+                    type_: type_.clone(),
+                    source,
+                    params: params.clone(),
+                }
+            }
+            unsupported => panic!(
+                "Applying with_source() on resource type '{}' is not allowed",
+                unsupported.to_string()
+            ),
+        }
     }
 
-    pub fn type_(&self) -> ResourceTypes {
-        self.type_.clone()
+    pub fn with_params(&self, new_params: &Vec<(&str, &str)>) -> Self {
+        match self {
+            Self::Custom {
+                ref name,
+                ref type_,
+                ref source,
+                ref params,
+            } => {
+                let mut params = params.clone();
+                new_params
+                    .iter()
+                    .map(|(k, v)| params.insert(k.to_string(), v.to_string()))
+                    .count();
+
+                Self::Custom {
+                    name: name.clone(),
+                    type_: type_.clone(),
+                    source: source.clone(),
+                    params,
+                }
+            }
+            unsupported => panic!(
+                "Applying with_params() on resource type '{}' is not allowed",
+                unsupported.to_string()
+            ),
+        }
     }
 }
 
@@ -66,11 +110,12 @@ pub struct Resource {
     type_: ResourceTypes,
     source: Config,
     trigger: bool,
+    version: Option<Version>,
 }
 
 impl Serialize for Resource {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut state = serializer.serialize_struct("Resource", 4)?;
+        let mut state = serializer.serialize_struct("Resource", 5)?;
         state.serialize_field("name", &self.name)?;
         state.serialize_field("type", &self.type_)?;
         if self.icon.is_some() {
@@ -78,6 +123,9 @@ impl Serialize for Resource {
         }
         if !self.source.is_empty() {
             state.serialize_field("source", &self.source)?;
+        }
+        if self.version.is_some() {
+            state.serialize_field("version", &self.version)?;
         }
         state.end()
     }
@@ -91,6 +139,7 @@ impl Resource {
             type_: res_type,
             source: HashMap::new(),
             trigger: false,
+            version: None,
         }
     }
 
@@ -126,6 +175,7 @@ impl Resource {
             },
             source,
             trigger: false,
+            version: None,
         }
     }
 
@@ -139,11 +189,22 @@ impl Resource {
                 .map(|(k, v)| (k.to_string(), v.to_string()))
                 .collect(),
             trigger: false,
+            version: None,
         }
     }
 
-    pub fn registry_image() -> Self {
-        todo!()
+    pub fn registry_image(repository: &str) -> Self {
+        Self {
+            name: String::from(""),
+            type_: ResourceTypes::RegistryImage,
+            icon: Some(String::from("docker")),
+            source: [("repository", repository)]
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+            trigger: false,
+            version: None,
+        }
     }
 
     pub fn docker_image() -> Self {
@@ -195,8 +256,14 @@ impl Resource {
         Get::from("", self, None)
     }
 
-    pub fn as_task_resource(&self) -> TaskResource {
+    pub fn as_task_input_resource(&self) -> TaskResource {
         TaskResource::Resource(self.clone())
+    }
+
+    pub fn as_task_image_resource(&self) -> TaskImageResource {
+        TaskImageResource {
+            resource: self.clone(),
+        }
     }
 }
 
@@ -250,69 +317,18 @@ pub enum TaskImageResourceType {
     Custom(String),
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
 pub struct TaskImageResource {
-    #[serde(rename(serialize = "type"))]
-    type_: TaskImageResourceType,
-    source: Config,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    params: Option<Config>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    version: Option<Version>,
+    resource: Resource,
 }
 
 impl TaskImageResource {
-    pub fn registry_image(repository: &str) -> Self {
-        let mut source = HashMap::new();
-        source.insert(String::from("repository"), repository.to_string());
-        Self {
-            type_: TaskImageResourceType::RegistryImage,
-            source,
+    pub(crate) fn to_anonymouse_resource(&self) -> AnonymousResource {
+        AnonymousResource {
+            type_: self.resource.type_.to_string(),
+            source: self.resource.source.clone(),
             params: None,
-            version: None,
+            version: self.resource.version.clone(),
         }
-    }
-
-    pub fn docker_image(repository: &str) -> Self {
-        let mut source = HashMap::new();
-        source.insert(String::from("repository"), repository.to_string());
-        Self {
-            type_: TaskImageResourceType::DockerImage,
-            source,
-            params: None,
-            version: None,
-        }
-    }
-
-    pub fn with_tag(&self, tag: &str) -> Self {
-        let mut this = self.clone();
-        this.source.insert(String::from("tag"), tag.to_string());
-        this
-    }
-
-    pub fn with_source(&self, source: &Vec<(&str, &str)>) -> Self {
-        let mut this = self.clone();
-        source
-            .iter()
-            .map(|(k, v)| this.source.insert(k.to_string(), v.to_string()))
-            .count();
-        this
-    }
-
-    pub fn with_params(&self, params: &Vec<(&str, &str)>) -> Self {
-        let mut this = self.clone();
-        this.params = Some(
-            params
-                .iter()
-                .map(|(k, v)| (k.to_string(), v.to_string()))
-                .collect(),
-        );
-        this
-    }
-
-    pub fn with_version(&self, version: Version) -> Self {
-        let mut this = self.clone();
-        this.version = Some(version);
-        this
     }
 }

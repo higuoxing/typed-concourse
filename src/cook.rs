@@ -26,7 +26,7 @@ fn collect_resource(
 ) -> Result<(), Errors> {
     match step {
         Step::Get(ref get_step) => {
-            if let ResourceTypes::Custom(_) = get_step.resource().resource_type().clone() {
+            if let ResourceTypes::Custom { .. } = get_step.resource().resource_type().clone() {
                 resource_types.insert(
                     get_step.resource().resource_type().to_string(),
                     get_step.resource().resource_type().clone(),
