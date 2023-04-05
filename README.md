@@ -2,8 +2,6 @@
 
 > `typed-concourse` is a Rust library that allows users to write [Concourse CI](https://concourse-ci.org/) configuration in Rust.
 
-<img src=".github/assets/typed-concourse.png" width="300">
-
 ## Features
 
 - Type-safe configuration: `typed-concourse` provides a type-safe way to define your Concourse pipelines and tasks, ensuring that your configuration is correct at compile-time.
