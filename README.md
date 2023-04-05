@@ -10,13 +10,9 @@
 
 - Intuitive API: The API for `typed-concourse` is designed to be intuitive and easy to use. Whether you're a seasoned Rust developer or new to the language, you'll be able to use `typed-concourse` to create your Concourse pipelines and tasks quickly and easily.
 
-## Problems that are not very easy to solve in plain YAYML or YAML generator.
+- Code indention: When writing configurations in YAML/YAML generator, you still need to carefully indent your codes or the parser cannot parse it correctly. With `typed-concourse`, you can write configuration in the Rust language and your IDE/editor will take care of it!
 
-- Fly-without-push v.s. Push-without-fly: TODO.
-
-- Code indention: TODO.
-
-- Jump to resources/jobs/tasks definition: TODO.
+- Jump to symbols definition: Rust IDE is very good at indexing Rust codes. With it you will gain better development experience than writing YAML codes!
 
 ## Getting started
 
@@ -24,18 +20,47 @@ To use `typed-concourse` in your Rust project, simply add the following to your 
 
 ```toml
 [dependencies]
-typed-concourse = "0.1.0"
+typed-concourse = { git = "https://github.com/higuoxing/typed-concourse", branch = "main" }
 ```
 
 Then, in your Rust code, you can use `typed-concourse` to define your Concourse configuration. For example, here's how you could define a simple pipeline:
 
 ```rust
-[[TODO]]
+fn hello_world_example() {
+    let pipeline = Pipeline::new().append(
+        Job::new("job").with_public(true).then(
+            Task::new()
+                .with_name("simple-task")
+                .run(&Command::new("echo", &vec!["Hello world!"]))
+                .to_step(),
+        ),
+    );
+
+    assert_eq!(
+        cook::cook_pipeline(&pipeline).unwrap().as_str(),
+        r#"jobs:
+- name: job
+  public: true
+  plan:
+  - task: simple-task
+    config:
+      platform: linux
+      image_resource:
+        type: registry-image
+        source:
+          repository: busybox
+      run:
+        path: echo
+        args:
+        - Hello world!
+"#
+    );
+}
 ```
 
 This creates a pipeline with a single job that runs a simple task to echo `"Hello, world!"`.
 
-For more examples and documentation, please refer to the [`src/example.rs`](https://github.com/higuoxing/typed-concourse/blob/main/src/examples.rs) and [API documentation](TODO).
+For more examples and documentation, please refer to the [`src/example.rs`](https://github.com/higuoxing/typed-concourse/blob/main/src/examples.rs).
 
 ## Contributing
 

@@ -15,9 +15,7 @@ mod examples {
             Job::new("job").with_public(true).then(
                 Task::new()
                     .with_name("simple-task")
-                    .mutate_task_config(|task_config| {
-                        task_config.run(&Command::new("echo", &vec!["Hello world!"]))
-                    })
+                    .run(&Command::new("echo", &vec!["Hello world!"]))
                     .to_step(),
             ),
         );
