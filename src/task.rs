@@ -173,8 +173,16 @@ impl TaskResource {
     }
 }
 
+#[derive(Debug, Clone)]
+enum TaskKind {
+    FromConfig,
+    FromFile,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct Task {
+    #[serde(skip_serializing)]
+    kind: TaskKind,
     task: Identifier,
     config: TaskConfig,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -200,6 +208,7 @@ pub struct Task {
 impl Task {
     pub fn linux() -> Task {
         Self {
+            kind: TaskKind::FromConfig,
             task: Generator::default().next().unwrap(),
             config: TaskConfig::linux_default(),
             image: None,
@@ -221,6 +230,12 @@ impl Task {
     }
 
     pub fn run(&self, command: &Command) -> Self {
+        if let TaskKind::FromFile = self.kind {
+            panic!(
+                ".run() cannot be called in 'task' ('{}') that is initialized from 'file'.",
+                self.task.as_str()
+            );
+        }
         let mut this = self.clone();
         this.config.run = command.clone();
         this
