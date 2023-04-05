@@ -4,6 +4,7 @@ use crate::resource::Resource;
 use crate::step::InParallel;
 use crate::step::Step;
 use crate::task::Input;
+use crate::task::Output;
 use crate::task::TaskDef;
 use crate::task::TaskResource;
 use serde_yaml;
@@ -48,7 +49,7 @@ fn collect_resource_in_step(
                 TaskDef::Config {
                     ref config,
                     ref inputs,
-                    ..
+                    ref outputs,
                 } => {
                     let mut new_config = config.clone();
                     // 1. Check if we need to get resource for inputs.
@@ -66,6 +67,29 @@ fn collect_resource_in_step(
                                         new_inputs.push(Input::new(res.name().as_str()));
                                         new_config.inputs = Some(new_inputs);
                                     }
+                                }
+                            } else if let TaskResource::Output(ref output) = inp {
+                                if config.inputs.is_none() {
+                                    new_config.inputs = Some(vec![Input::new(output.as_str())]);
+                                } else {
+                                    let mut new_inputs = config.inputs.clone().unwrap();
+                                    new_inputs.push(Input::new(output.as_str()));
+                                    new_config.inputs = Some(new_inputs);
+                                }
+                            }
+                        }
+                    }
+
+                    // Append outputs to task_config.
+                    if let Some(ref outputs) = outputs {
+                        for out in outputs.iter() {
+                            if let TaskResource::Output(ref out) = out {
+                                if config.outputs.is_none() {
+                                    new_config.outputs = Some(vec![Output::new(out.as_str())])
+                                } else {
+                                    let mut new_outputs = config.outputs.clone().unwrap();
+                                    new_outputs.push(Output::new(out.as_str()));
+                                    new_config.outputs = Some(new_outputs);
                                 }
                             }
                         }

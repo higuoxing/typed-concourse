@@ -195,7 +195,7 @@ impl Resource {
 
     pub fn registry_image(repository: &str) -> Self {
         Self {
-            name: String::from(""),
+            name: repository.to_string(),
             type_: ResourceTypes::RegistryImage,
             icon: Some(String::from("docker")),
             source: [("repository", repository)]

@@ -99,14 +99,17 @@ pub struct TaskConfig {
     pub(crate) params: Option<EnvVars>,
     pub(crate) inputs: Option<Vec<Input>>,
     pub(crate) outputs: Option<Vec<Output>>,
+    pub(crate) serialize_image_resource: bool,
 }
 
 impl Serialize for TaskConfig {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut state = serializer.serialize_struct("TaskConfig", 6)?;
         state.serialize_field("platform", &self.platform)?;
-        let anonymouse_resource = self.image_resource.to_anonymouse_resource();
-        state.serialize_field("image_resource", &anonymouse_resource)?;
+        if self.serialize_image_resource {
+            let anonymouse_resource = self.image_resource.to_anonymouse_resource();
+            state.serialize_field("image_resource", &anonymouse_resource)?;
+        }
         state.serialize_field("run", &self.run)?;
         if self.params.is_some() {
             state.serialize_field("params", &self.params)?;
@@ -115,7 +118,7 @@ impl Serialize for TaskConfig {
             state.serialize_field("inputs", &self.inputs)?;
         }
         if self.outputs.is_some() {
-            state.serialize_field("inputs", &self.outputs)?;
+            state.serialize_field("outputs", &self.outputs)?;
         }
         state.end()
     }
@@ -130,6 +133,7 @@ impl TaskConfig {
             params: None,
             inputs: None,
             outputs: None,
+            serialize_image_resource: true,
         }
     }
 
@@ -239,7 +243,9 @@ impl Serialize for Task {
 
         match self.task_def {
             TaskDef::Config { ref config, .. } => {
-                state.serialize_field("config", config)?;
+                let mut config = config.clone();
+                config.serialize_image_resource = self.image.is_none();
+                state.serialize_field("config", &config)?;
             }
             TaskDef::File { .. } => {}
         }
@@ -332,8 +338,9 @@ impl Task {
         }
     }
 
-    pub fn with_image(&self) -> Self {
-        let this = self.clone();
+    pub fn with_image(&self, image: TaskImageResource) -> Self {
+        let mut this = self.clone();
+        this.image = Some(image);
         this
     }
 
@@ -396,7 +403,7 @@ impl Task {
         }
     }
 
-    pub fn bind_outputs(&self, outputs: &mut Vec<(&str, &mut TaskResource)>) -> Self {
+    pub fn bind_outputs(&self, outputs: &mut [(&str, &mut TaskResource)]) -> Self {
         match self.task_def {
             TaskDef::File { .. } => panic!(
                 ".bind_outputs() cannot be called in 'task' ('{}') that is initialized from 'file'.",
@@ -404,16 +411,20 @@ impl Task {
             ),
             TaskDef::Config { ref config, ref inputs, .. } => {
                 let mut this = self.clone();
-                let outputs = outputs.iter_mut().map(|(k, v)| {
-                    **v   = TaskResource::Output(k.to_string());
-                    v.clone()
-                }).collect::<Vec<TaskResource>>();
-                this.task_def = TaskDef::Config {
-                    config: config.clone(),
-                    inputs: inputs.clone(),
-                    outputs: Some(outputs),
-                };
-                this
+		if outputs.is_empty() {
+		    this
+		} else {
+                    let outputs = outputs.iter_mut().map(|(k, v)| {
+			**v   = TaskResource::Output(k.to_string());
+			v.clone()
+                    }).collect::<Vec<TaskResource>>();
+                    this.task_def = TaskDef::Config {
+			config: config.clone(),
+			inputs: inputs.clone(),
+			outputs: Some(outputs),
+                    };
+                    this
+		}
             }
         }
     }

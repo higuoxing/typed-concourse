@@ -5,7 +5,7 @@ mod examples {
         job::Job,
         pipeline::Pipeline,
         resource::Resource,
-        task::{Command, Task},
+        task::{Command, Task, TaskResource},
     };
 
     // https://concourse-ci.org/hello-world-example.html
@@ -394,6 +394,110 @@ resources:
         path: echo
         args:
         - This job was succeeded!
+"#
+        );
+    }
+
+    // https://concourse-ci.org/task-step.html
+    #[test]
+    fn fetching_and_using_an_image() {
+        let golang_image = Resource::registry_image("golang").with_source(&[("tag", "1.17")]);
+        let pipeline = Pipeline::new().append(
+            Job::new("fetch-and-run-image").then(
+                Task::new()
+                    .with_name("use-fetched-image-in-task")
+                    .with_image(golang_image.as_task_image_resource())
+                    .run(&Command::new("go", &["version"]))
+                    .to_step(),
+            ),
+        );
+
+        assert_eq!(
+            cook_pipeline(&pipeline).unwrap(),
+            r#"jobs:
+- name: fetch-and-run-image
+  plan:
+  - in_parallel:
+    - get: golang
+  - task: use-fetched-image-in-task
+    config:
+      platform: linux
+      run:
+        path: go
+        args:
+        - version
+    image: golang
+resources:
+- name: golang
+  type: registry-image
+  icon: docker
+  source:
+    repository: golang
+    tag: '1.17'
+"#
+        );
+    }
+
+    // https://concourse-ci.org/task-inputs-outputs-example.html
+    #[test]
+    fn task_inputs_outputs_example() {
+        let mut files = TaskResource::unbound();
+        let pipeline = Pipeline::new().append(
+            Job::new("create-and-consume")
+                .then(
+                    Task::new()
+                        .with_name("make-a-file")
+                        .run(&Command::new(
+                            "sh",
+                            &[
+                                "-exc",
+                                "ls -la; echo \"Create a file on $(date)\" > ./files/created_file",
+                            ],
+                        ))
+                        .bind_outputs(&mut [("files", &mut files)])
+                        .to_step(),
+                )
+                .then(
+                    Task::new()
+                        .with_name("consume-the-file")
+                        .run(&Command::new("cat", &["./files/created_file"]))
+                        .with_inputs(&[&files])
+                        .to_step(),
+                ),
+        );
+
+        assert_eq!(
+            cook_pipeline(&pipeline).unwrap(),
+            r#"jobs:
+- name: create-and-consume
+  plan:
+  - task: make-a-file
+    config:
+      platform: linux
+      image_resource:
+        type: registry-image
+        source:
+          repository: busybox
+      run:
+        path: sh
+        args:
+        - -exc
+        - ls -la; echo "Create a file on $(date)" > ./files/created_file
+      outputs:
+      - name: files
+  - task: consume-the-file
+    config:
+      platform: linux
+      image_resource:
+        type: registry-image
+        source:
+          repository: busybox
+      run:
+        path: cat
+        args:
+        - ./files/created_file
+      inputs:
+      - name: files
 "#
         );
     }
