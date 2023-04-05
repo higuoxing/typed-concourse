@@ -9,11 +9,11 @@ use serde::Serializer;
 
 #[derive(Debug, Clone)]
 pub struct Get {
-    get: Identifier,
-    resource: Resource,
-    version: Option<Version>,
-    trigger: bool,
-    passed: Option<Vec<Job>>,
+    pub(crate) get: Identifier,
+    pub(crate) resource: Resource,
+    pub(crate) version: Option<Version>,
+    pub(crate) trigger: bool,
+    pub(crate) passed: Option<Vec<Job>>,
 }
 
 impl Serialize for Get {
@@ -72,9 +72,9 @@ impl Get {
         this
     }
 
-    pub fn with_passed(&self, jobs: &Vec<Job>) -> Self {
+    pub fn with_passed(&self, jobs: &[Job]) -> Self {
         let mut this = self.clone();
-        this.passed = Some(jobs.clone());
+        this.passed = Some(jobs.to_vec());
         this
     }
 

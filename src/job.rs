@@ -4,7 +4,7 @@ use crate::step::Step;
 use serde::Serialize;
 
 #[derive(Debug, Clone)]
-enum JobKind {
+pub(crate) enum JobKind {
     Unbound,
     Initialized,
 }
@@ -12,23 +12,23 @@ enum JobKind {
 #[derive(Debug, Clone, Serialize)]
 pub struct Job {
     #[serde(skip_serializing)]
-    kind: JobKind,
-    name: Identifier,
+    pub(crate) kind: JobKind,
+    pub(crate) name: Identifier,
     #[serde(skip_serializing_if = "Option::is_none")]
     public: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    serial: Option<bool>,
-    plan: Vec<Step>,
+    pub(crate) serial: Option<bool>,
+    pub(crate) plan: Vec<Step>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    on_failure: Option<Step>,
+    pub(crate) on_failure: Option<Step>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    on_error: Option<Step>,
+    pub(crate) on_error: Option<Step>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    on_abort: Option<Step>,
+    pub(crate) on_abort: Option<Step>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    on_success: Option<Step>,
+    pub(crate) on_success: Option<Step>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    ensure: Option<Step>,
+    pub(crate) ensure: Option<Step>,
 }
 
 impl Job {
@@ -84,10 +84,10 @@ impl Job {
         this
     }
 
-    pub fn parallel(&self, steps: &Vec<Step>) -> Self {
+    pub fn parallel(&self, steps: &[Step]) -> Self {
         let mut this = self.clone();
         this.plan
-            .push(Step::InParallel(InParallel::Steps(steps.clone())));
+            .push(Step::InParallel(InParallel::Steps(steps.to_vec())));
         this
     }
 
@@ -139,16 +139,12 @@ impl Job {
         this
     }
 
-    pub fn plan(&self) -> &Vec<Step> {
+    pub fn plan(&self) -> &[Step] {
         &self.plan
     }
 
     pub fn bind(self, var: &mut Self) -> Self {
         *var = self.clone();
         self
-    }
-
-    pub(crate) fn reset_plan(&mut self) {
-        self.plan = vec![];
     }
 }

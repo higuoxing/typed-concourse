@@ -1,173 +1,150 @@
 use crate::errors::Errors;
 use crate::pipeline::Pipeline;
 use crate::resource::Resource;
-use crate::resource::ResourceTypes;
 use crate::step::InParallel;
 use crate::step::Step;
 use crate::task::Input;
+use crate::task::TaskDef;
 use crate::task::TaskResource;
 use serde_yaml;
 use std::collections::HashMap;
 
-fn check_pipeline(pipeline: &Pipeline) -> Result<(), Errors> {
-    if pipeline.jobs().is_empty() {
-        return Err(Errors::CookError(String::from(
-            "Pipeline must contain at least one job",
-        )));
-    }
-
-    Ok(())
-}
-
-fn collect_resource(
+fn collect_resource_in_step(
     step: &Step,
-    resources: &mut HashMap<String, Resource>,
-    resource_types: &mut HashMap<String, ResourceTypes>,
-) -> Result<(), Errors> {
+    curr_resources: &mut HashMap<String, Resource>,
+    resource_collector: &mut HashMap<String, Resource>,
+) -> Result<Vec<Step>, Errors> {
+    let mut adjusted_step = step.clone();
+    let mut parallel_to_get = vec![];
     match step {
         Step::Get(ref get_step) => {
-            if let ResourceTypes::Custom { .. } = get_step.resource().resource_type().clone() {
-                resource_types.insert(
-                    get_step.resource().resource_type().to_string(),
-                    get_step.resource().resource_type().clone(),
-                );
-            }
-
-            resources.insert(get_step.resource().name(), get_step.resource().clone());
+            curr_resources.insert(get_step.get.clone(), get_step.resource.clone());
         }
         Step::InParallel(ref in_parallel) => match in_parallel {
             InParallel::Steps(ref steps) => {
-                for s in steps {
-                    collect_resource(s, resources, resource_types)?;
+                let mut temp_curr_resources = HashMap::new();
+                let mut adjusted_parallel_steps = vec![];
+                for parallel_step in steps.iter() {
+                    adjusted_parallel_steps.append(&mut collect_resource_in_step(
+                        parallel_step,
+                        &mut temp_curr_resources,
+                        resource_collector,
+                    )?);
                 }
+
+                temp_curr_resources
+                    .iter()
+                    .map(|(k, v)| curr_resources.insert(k.clone(), v.clone()))
+                    .count();
+
+                adjusted_step = Step::InParallel(InParallel::Steps(adjusted_parallel_steps));
             }
-            _ => todo!(),
+            _ => {}
         },
-        Step::Task(ref task) => match task.inputs() {
-            Some(ref inputs) => {
-                for inp in inputs {
-                    if let TaskResource::Resource(ref resource) = inp {
-                        resources.insert(resource.name(), resource.clone());
-                    }
-                }
-            }
-            None => {}
-        },
-        _ => todo!(),
-    }
-    Ok(())
-}
-
-fn collect_resource_used_in_task(step: &Step) -> Result<(Option<Vec<Resource>>, Step), Errors> {
-    match step {
-        Step::Task(ref task) => match task.inputs() {
-            Some(ref inputs) => {
-                let mut resources = vec![];
-                for inp in inputs {
-                    if let TaskResource::Resource(ref resource) = inp {
-                        resources.push(resource.clone());
-                    }
-                }
-
-                let resources = if resources.is_empty() {
-                    None
-                } else {
-                    Some(resources)
-                };
-
-                match &resources {
-                    Some(res) => {
-                        // Mutate the task to add 'inputs' tags into its config.
-                        let mut task = task.clone();
-                        match task.task_config_mut().inputs {
-                            Some(ref mut inputs) => {
-                                inputs.append(
-                                    &mut res
-                                        .iter()
-                                        .map(|r| Input::new(r.name().as_str()))
-                                        .collect(),
-                                );
-                            }
-                            None => {
-                                task.task_config_mut().inputs = Some(
-                                    res.iter().map(|r| Input::new(r.name().as_str())).collect(),
-                                );
+        Step::Put(..) => {}
+        Step::Task(ref task_step) => {
+            match task_step.task_def {
+                TaskDef::File { .. } => { /* Do nothing. */ }
+                TaskDef::Config {
+                    ref config,
+                    ref inputs,
+                    ..
+                } => {
+                    let mut new_config = config.clone();
+                    // 1. Check if we need to get resource for inputs.
+                    if let Some(ref inputs) = inputs {
+                        for inp in inputs.iter() {
+                            if let TaskResource::Resource(ref res) = inp {
+                                if !curr_resources.contains_key(res.name().as_str()) {
+                                    curr_resources.insert(res.name(), res.clone());
+                                    parallel_to_get.push(res.as_get_resource().get());
+                                    if config.inputs.is_none() {
+                                        new_config.inputs =
+                                            Some(vec![Input::new(res.name().as_str())]);
+                                    } else {
+                                        let mut new_inputs = config.inputs.clone().unwrap();
+                                        new_inputs.push(Input::new(res.name().as_str()));
+                                        new_config.inputs = Some(new_inputs);
+                                    }
+                                }
                             }
                         }
-                        return Ok((resources, Step::Task(task)));
                     }
-                    None => { /* Do nothing. */ }
-                }
 
-                Ok((resources, step.clone()))
+                    adjusted_step =
+                        Step::Task(task_step.clone().mutate_task_config(|_| new_config.clone()));
+
+                    // 2. Check if we need to get resource for task.image.
+                    if let Some(image) = task_step.image.as_ref() {
+                        if !curr_resources.contains_key(image.resource.name.as_str()) {
+                            curr_resources.insert(image.resource.name(), image.resource.clone());
+                            parallel_to_get.push(
+                                task_step
+                                    .image
+                                    .as_ref()
+                                    .unwrap()
+                                    .resource
+                                    .as_get_resource()
+                                    .get(),
+                            );
+                        }
+                    }
+                }
             }
-            None => Ok((None, step.clone())),
-        },
-        _ => Ok((None, step.clone())),
+        }
     }
+
+    curr_resources
+        .iter()
+        .map(|(k, v)| resource_collector.insert(k.clone(), v.clone()))
+        .count();
+
+    if !parallel_to_get.is_empty() {
+        Ok(vec![
+            Step::InParallel(InParallel::Steps(parallel_to_get)),
+            adjusted_step,
+        ])
+    } else {
+        Ok(vec![adjusted_step])
+    }
+}
+
+fn collect_resource(
+    pipeline: &Pipeline,
+    resource_collector: &mut HashMap<String, Resource>,
+) -> Result<Pipeline, Errors> {
+    let mut adjusted_pipeline = pipeline.clone();
+    // Reset the plan, since we will reconstruct it.
+    adjusted_pipeline.jobs = vec![];
+
+    for job in pipeline.jobs.iter() {
+        // Current resources is used to record available resources for the current step.
+        let mut curr_job = job.clone();
+        // Reset the plan, since we will reconstruct it.
+        curr_job.plan = vec![];
+
+        let mut curr_resources = HashMap::new();
+        for step in job.plan.iter() {
+            let mut adjusted_steps =
+                collect_resource_in_step(step, &mut curr_resources, resource_collector)?;
+            curr_job.plan.append(&mut adjusted_steps);
+        }
+
+        // Append the adjusted job to the pipeline.
+        adjusted_pipeline.jobs.push(curr_job);
+    }
+
+    Ok(adjusted_pipeline)
 }
 
 fn optimize_pipeline(pipeline: &Pipeline) -> Result<Pipeline, Errors> {
-    let mut new_pipeline = pipeline.clone();
-    new_pipeline.jobs = vec![];
-
-    for job in pipeline.jobs() {
-        let mut new_job = job.clone();
-        new_job.reset_plan();
-
-        for step in job.plan() {
-            // 1. Identify resources that are directly referenced in tasks.
-            // 2. Insert get steps before the task and add 'input' tags to that task.
-            let (ref_resources, step) = collect_resource_used_in_task(step)?;
-            match ref_resources {
-                Some(resources) => {
-                    new_job = new_job.parallel(
-                        &resources
-                            .iter()
-                            .map(|res| res.as_get_resource().get())
-                            .collect::<Vec<Step>>(),
-                    );
-                }
-                None => {}
-            }
-            new_job = new_job.then(step);
-        }
-
-        new_pipeline = new_pipeline.append(new_job);
-    }
-
-    Ok(new_pipeline)
-}
-
-fn collect_resources(pipeline: &Pipeline) -> Result<Pipeline, Errors> {
-    let mut resource_types = HashMap::new();
-    let mut resources = HashMap::new();
-
-    for job in pipeline.jobs() {
-        for step in job.plan() {
-            collect_resource(step, &mut resources, &mut resource_types)?;
-        }
-    }
-
-    let resources = resources.iter().map(|(_, res)| res.clone()).collect();
-    let resource_types = resource_types
-        .iter()
-        .map(|(_, v)| v.clone())
-        .collect::<Vec<ResourceTypes>>();
-
-    Ok(pipeline
-        .with_resources(resources)
-        .with_resource_types(resource_types))
+    let mut resource_collector = HashMap::new();
+    let pipeline = collect_resource(pipeline, &mut resource_collector)?;
+    Ok(pipeline.with_resources(resource_collector.iter().map(|(_, v)| v.clone()).collect()))
 }
 
 pub fn cook_pipeline(pipeline: &Pipeline) -> Result<String, Errors> {
     let pipeline = optimize_pipeline(pipeline)?;
-    // Collect resources.
-    let pipeline = collect_resources(&pipeline)?;
-
-    // Verify the pipeline before generating the YAML configuration file.
-    check_pipeline(&pipeline)?;
-
     match serde_yaml::to_string(&pipeline) {
         Ok(yaml) => Ok(yaml),
         Err(e) => Err(Errors::SerdeError(e)),

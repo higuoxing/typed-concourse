@@ -14,3 +14,10 @@ impl Errors {
         Errors::CookError(String::from(detail))
     }
 }
+
+#[macro_export]
+macro_rules! err {
+    ($($arg:tt)*) => {
+        Err(Errors::from(format!($($arg)*).as_str()))
+    }
+}

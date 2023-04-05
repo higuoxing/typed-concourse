@@ -192,7 +192,7 @@ resources:
             Job::new("job").then(
                 Task::new()
                     .with_name("list-files")
-                    .with_input(&concourse_docs_git.as_task_input_resource())
+                    .with_inputs(&vec![&concourse_docs_git.as_task_input_resource()])
                     .run(&Command::new("ls", &vec!["./concourse-docs-git"]))
                     .to_step(),
             ),

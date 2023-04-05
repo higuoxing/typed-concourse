@@ -4,6 +4,7 @@ use crate::schema::DirPath;
 use crate::schema::EnvVars;
 use crate::schema::FilePath;
 use crate::schema::Identifier;
+use crate::schema::Vars;
 use crate::step::Step;
 use names::Generator;
 use serde::ser::SerializeStruct;
@@ -27,7 +28,7 @@ pub struct Command {
 }
 
 impl Command {
-    pub fn new(path: &str, args: &Vec<&str>) -> Self {
+    pub fn new(path: &str, args: &[&str]) -> Self {
         Self {
             path: path.to_string(),
             args: if args.is_empty() {
@@ -45,11 +46,11 @@ fn boolean_is_false(b: &bool) -> bool {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Input {
-    name: Identifier,
+    pub(crate) name: Identifier,
     #[serde(skip_serializing_if = "Option::is_none")]
-    path: Option<DirPath>,
+    pub(crate) path: Option<DirPath>,
     #[serde(skip_serializing_if = "boolean_is_false")]
-    optional: bool,
+    pub(crate) optional: bool,
 }
 
 impl Input {
@@ -70,9 +71,9 @@ impl Input {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Output {
-    name: Identifier,
+    pub(crate) name: Identifier,
     #[serde(skip_serializing_if = "Option::is_none")]
-    path: Option<DirPath>,
+    pub(crate) path: Option<DirPath>,
 }
 
 impl Output {
@@ -92,12 +93,12 @@ impl Output {
 
 #[derive(Debug, Clone)]
 pub struct TaskConfig {
-    platform: Platform,
-    image_resource: TaskImageResource,
-    run: Command,
-    params: Option<EnvVars>,
+    pub(crate) platform: Platform,
+    pub(crate) image_resource: TaskImageResource,
+    pub(crate) run: Command,
+    pub(crate) params: Option<EnvVars>,
     pub(crate) inputs: Option<Vec<Input>>,
-    outputs: Option<Vec<Output>>,
+    pub(crate) outputs: Option<Vec<Output>>,
 }
 
 impl Serialize for TaskConfig {
@@ -158,7 +159,7 @@ impl TaskConfig {
         this
     }
 
-    pub fn with_env(&self, env: &Vec<(&str, &str)>) -> Self {
+    pub fn with_env(&self, env: &[(&str, &str)]) -> Self {
         let mut this = self.clone();
         this.params = Some(
             env.iter()
@@ -199,24 +200,32 @@ impl TaskResource {
 }
 
 #[derive(Debug, Clone)]
-enum TaskKind {
-    FromConfig,
-    FromFile,
+pub(crate) enum TaskDef {
+    File {
+        file: FilePath,
+        vars: Vars,
+    },
+    Config {
+        config: TaskConfig,
+        // Inputs shouldn't be serialized!!
+        inputs: Option<Vec<TaskResource>>,
+        // Outputs shouldn't be serialized!!
+        outputs: Option<Vec<TaskResource>>,
+    },
 }
 
 #[derive(Debug, Clone)]
 pub struct Task {
-    kind: TaskKind,
     task: Identifier,
-    config: TaskConfig,
-    image: Option<TaskImageResource>,
+    pub(crate) task_def: TaskDef,
+    pub(crate) image: Option<TaskImageResource>,
+    priviledged: bool,
+    // TODO: container-limit.
     params: Option<EnvVars>,
     input_mapping: Option<HashMap<String, String>>,
     output_mapping: Option<HashMap<String, String>>,
-    // Inputs shouldn't be serialized!!
-    inputs: Option<Vec<TaskResource>>,
-    // Outputs shouldn't be serialized!!
-    outputs: Option<Vec<TaskResource>>,
+
+    // Hooks.
     on_failure: Option<Box<Step>>,
     on_abort: Option<Box<Step>>,
     on_success: Option<Box<Step>>,
@@ -224,26 +233,43 @@ pub struct Task {
 
 impl Serialize for Task {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut state = serializer.serialize_struct("Task", 6)?;
+        let mut state = serializer.serialize_struct("Task", 9)?;
+
         state.serialize_field("task", &self.task)?;
-        state.serialize_field("config", &self.config)?;
-        if self.params.is_some() {
-            state.serialize_field("params", &self.params)?;
+
+        match self.task_def {
+            TaskDef::Config { ref config, .. } => {
+                state.serialize_field("config", config)?;
+            }
+            TaskDef::File { .. } => {}
         }
-        if self.input_mapping.is_some() {
-            state.serialize_field("input_mapping", &self.input_mapping)?;
+
+        if let Some(ref image) = self.image.as_ref() {
+            state.serialize_field("image", image.resource.name.as_str())?;
         }
-        if self.output_mapping.is_some() {
-            state.serialize_field("output_mapping", &self.input_mapping)?;
+
+        if self.priviledged {
+            state.serialize_field("priviledged", &true)?;
         }
-        if self.on_failure.is_some() {
-            state.serialize_field("on_failure", &self.on_failure)?;
+
+        if let Some(ref input_mapping) = self.input_mapping.as_ref() {
+            state.serialize_field("input_mapping", input_mapping)?;
         }
-        if self.on_abort.is_some() {
-            state.serialize_field("on_abort", &self.on_abort)?;
+
+        if let Some(ref output_mapping) = self.output_mapping.as_ref() {
+            state.serialize_field("output_mapping", output_mapping)?;
         }
-        if self.on_success.is_some() {
-            state.serialize_field("on_success", &self.on_success)?;
+
+        if let Some(ref on_failure) = self.on_failure.as_ref() {
+            state.serialize_field("on_failure", on_failure.as_ref())?;
+        }
+
+        if let Some(ref on_abort) = self.on_abort.as_ref() {
+            state.serialize_field("on_abort", on_abort.as_ref())?;
+        }
+
+        if let Some(ref on_success) = self.on_success.as_ref() {
+            state.serialize_field("on_success", on_success.as_ref())?;
         }
 
         state.end()
@@ -253,15 +279,17 @@ impl Serialize for Task {
 impl Task {
     pub fn new() -> Task {
         Self {
-            kind: TaskKind::FromConfig,
             task: Generator::default().next().unwrap(),
-            config: TaskConfig::linux_default(),
+            task_def: TaskDef::Config {
+                config: TaskConfig::linux_default(),
+                inputs: None,
+                outputs: None,
+            },
             image: None,
+            priviledged: false,
             params: None,
             input_mapping: None,
             output_mapping: None,
-            inputs: None,
-            outputs: None,
             on_abort: None,
             on_failure: None,
             on_success: None,
@@ -281,15 +309,27 @@ impl Task {
     }
 
     pub fn run(&self, command: &Command) -> Self {
-        if let TaskKind::FromFile = self.kind {
-            panic!(
+        match self.task_def {
+            TaskDef::File { .. } => panic!(
                 ".run() cannot be called in 'task' ('{}') that is initialized from 'file'.",
                 self.task.as_str()
-            );
+            ),
+            TaskDef::Config {
+                ref config,
+                ref inputs,
+                ref outputs,
+            } => {
+                let mut this = self.clone();
+                let mut this_config = config.clone();
+                this_config.run = command.clone();
+                this.task_def = TaskDef::Config {
+                    config: this_config,
+                    inputs: inputs.clone(),
+                    outputs: outputs.clone(),
+                };
+                this
+            }
         }
-        let mut this = self.clone();
-        this.config.run = command.clone();
-        this
     }
 
     pub fn with_image(&self) -> Self {
@@ -298,12 +338,27 @@ impl Task {
     }
 
     pub fn with_image_resource(&self, image_resource: TaskImageResource) -> Self {
-        let mut this = self.clone();
-        this.config.image_resource = image_resource;
-        this
+        match self.task_def {
+            TaskDef::File { .. } => panic!(".with_image_resource() cannot be called in 'task' ('{}') that is initialized from 'file'.", self.task.as_str()),
+            TaskDef::Config {
+                ref config,
+                ref inputs,
+                ref outputs,
+            } => {
+                let mut this_config = config.clone();
+                this_config.image_resource = image_resource;
+                let mut this = self.clone();
+                this.task_def = TaskDef::Config {
+                    config: this_config,
+                    inputs: inputs.clone(),
+                    outputs: outputs.clone(),
+                };
+                this
+            }
+        }
     }
 
-    pub fn with_params(&self, params: &Vec<(&str, &str)>) -> Self {
+    pub fn with_params(&self, params: &[(&str, &str)]) -> Self {
         let mut this = self.clone();
         this.params = Some(
             params
@@ -314,86 +369,75 @@ impl Task {
         this
     }
 
-    pub fn with_input(&self, input: &TaskResource) -> Self {
-        let mut this = self.clone();
-        match this.inputs {
-            Some(mut inputs) => {
-                inputs.push(input.clone());
-                this.inputs = Some(inputs);
-            }
-            None => {
-                this.inputs = Some(vec![input.clone()]);
+    pub fn with_inputs(&self, inputs: &[&TaskResource]) -> Self {
+        match self.task_def {
+            TaskDef::File { .. } => panic!(
+                ".with_inputs() cannot be called in 'task' ('{}') that is initialized from 'file'.",
+                self.task.as_str()
+            ),
+            TaskDef::Config {
+                ref config,
+                ref outputs,
+                ..
+            } => {
+                let mut this = self.clone();
+                this.task_def = TaskDef::Config {
+                    config: config.clone(),
+                    inputs: Some(
+                        inputs
+                            .iter()
+                            .map(|inp| inp.clone().clone())
+                            .collect::<Vec<TaskResource>>(),
+                    ),
+                    outputs: outputs.clone(),
+                };
+                this
             }
         }
-        this
-    }
-
-    pub fn with_inputs(&self, inputs: &Vec<&TaskResource>) -> Self {
-        let mut this = self.clone();
-        this.inputs = Some(
-            inputs
-                .iter()
-                .map(|inp| inp.clone().clone())
-                .collect::<Vec<TaskResource>>(),
-        );
-        this
-    }
-
-    pub fn bind_output(&self, output: &str, bind: &mut TaskResource) -> Self {
-        let mut this = self.clone();
-        match this.outputs {
-            Some(mut outputs) => {
-                outputs.push(TaskResource::output(output));
-                this.outputs = Some(outputs);
-            }
-            None => this.outputs = Some(vec![TaskResource::output(output)]),
-        }
-        *bind = TaskResource::output(output);
-        this
     }
 
     pub fn bind_outputs(&self, outputs: &mut Vec<(&str, &mut TaskResource)>) -> Self {
-        let mut this = self.clone();
-        match this.outputs {
-            Some(mut this_outputs) => {
-                for o in outputs.iter_mut() {
-                    this_outputs.push(TaskResource::output(o.0));
-                    *o.1 = TaskResource::output(o.0);
-                }
-                this.outputs = Some(this_outputs);
-            }
-            None => {
-                let mut this_outputs = vec![];
-                for o in outputs.iter_mut() {
-                    this_outputs.push(TaskResource::output(o.0));
-                    *o.1 = TaskResource::output(o.0);
-                }
-                this.outputs = Some(this_outputs);
+        match self.task_def {
+            TaskDef::File { .. } => panic!(
+                ".bind_outputs() cannot be called in 'task' ('{}') that is initialized from 'file'.",
+                self.task.as_str()
+            ),
+            TaskDef::Config { ref config, ref inputs, .. } => {
+                let mut this = self.clone();
+                let outputs = outputs.iter_mut().map(|(k, v)| {
+                    **v   = TaskResource::Output(k.to_string());
+                    v.clone()
+                }).collect::<Vec<TaskResource>>();
+                this.task_def = TaskDef::Config {
+                    config: config.clone(),
+                    inputs: inputs.clone(),
+                    outputs: Some(outputs),
+                };
+                this
             }
         }
-        this
-    }
-
-    pub fn outputs(&self) -> &Option<Vec<TaskResource>> {
-        &self.outputs
-    }
-
-    pub fn inputs(&self) -> &Option<Vec<TaskResource>> {
-        &self.inputs
-    }
-
-    pub(crate) fn task_config_mut(&mut self) -> &mut TaskConfig {
-        &mut self.config
     }
 
     pub fn mutate_task_config<F: Fn(&TaskConfig) -> TaskConfig>(
         &self,
         task_config_mutator: F,
     ) -> Self {
-        let mut this = self.clone();
-        let config = this.config;
-        this.config = task_config_mutator(&config);
-        this
+        match self.task_def {
+            TaskDef::File { .. } => panic!(".mutate_task_config() cannot be called in 'task' ('{}') that is initialized from 'file'.", self.task.as_str()),
+            TaskDef::Config {
+                ref config,
+                ref inputs,
+                ref outputs,
+            } => {
+                let mut this = self.clone();
+                this.task_def = TaskDef::Config {
+                    config: task_config_mutator(config),
+                    inputs: inputs.clone(),
+                    outputs: outputs.clone(),
+                };
+                this
+            }
+        }
     }
 
     pub fn to_step(&self) -> Step {

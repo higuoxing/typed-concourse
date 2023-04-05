@@ -10,6 +10,8 @@ pub type FilePath = String;
 pub type DirPath = String;
 // https://concourse-ci.org/config-basics.html#schema.config
 pub type Config = HashMap<String, String>;
+// https://concourse-ci.org/config-basics.html#schema.vars
+pub type Vars = HashMap<String, String>;
 // https://concourse-ci.org/config-basics.html#schema.env-vars
 pub type EnvVars = HashMap<String, String>;
 // https://concourse-ci.org/config-basics.html#schema.version

@@ -46,7 +46,7 @@ impl ResourceTypes {
         }
     }
 
-    pub fn with_source(&self, new_source: &Vec<(&str, &str)>) -> Self {
+    pub fn with_source(&self, new_source: &[(&str, &str)]) -> Self {
         match self {
             Self::Custom {
                 ref name,
@@ -74,7 +74,7 @@ impl ResourceTypes {
         }
     }
 
-    pub fn with_params(&self, new_params: &Vec<(&str, &str)>) -> Self {
+    pub fn with_params(&self, new_params: &[(&str, &str)]) -> Self {
         match self {
             Self::Custom {
                 ref name,
@@ -105,12 +105,12 @@ impl ResourceTypes {
 
 #[derive(Debug, Clone)]
 pub struct Resource {
-    name: Identifier,
-    icon: Option<String>,
-    type_: ResourceTypes,
-    source: Config,
-    trigger: bool,
-    version: Option<Version>,
+    pub(crate) name: Identifier,
+    pub(crate) icon: Option<String>,
+    pub(crate) type_: ResourceTypes,
+    pub(crate) source: Config,
+    pub(crate) trigger: bool,
+    pub(crate) version: Option<Version>,
 }
 
 impl Serialize for Resource {
@@ -243,7 +243,7 @@ impl Resource {
         &self.type_
     }
 
-    pub fn with_source(mut self, source: &Vec<(&str, &str)>) -> Self {
+    pub fn with_source(mut self, source: &[(&str, &str)]) -> Self {
         source
             .iter()
             .map(|(k, v)| self.source.insert(k.to_string(), v.to_string()))
@@ -279,7 +279,7 @@ pub struct AnonymousResource {
 }
 
 impl AnonymousResource {
-    pub fn from(type_: &str, source: &Vec<(&str, &str)>) -> Self {
+    pub fn from(type_: &str, source: &[(&str, &str)]) -> Self {
         Self {
             type_: type_.to_string(),
             source: source
@@ -291,7 +291,7 @@ impl AnonymousResource {
         }
     }
 
-    pub fn with_params(&self, params: &Vec<(&str, &str)>) -> Self {
+    pub fn with_params(&self, params: &[(&str, &str)]) -> Self {
         let mut this = self.clone();
         this.params = Some(
             params
@@ -319,7 +319,7 @@ pub enum TaskImageResourceType {
 
 #[derive(Debug, Clone)]
 pub struct TaskImageResource {
-    resource: Resource,
+    pub(crate) resource: Resource,
 }
 
 impl TaskImageResource {
