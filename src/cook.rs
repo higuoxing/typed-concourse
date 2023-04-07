@@ -60,20 +60,20 @@ fn collect_resource_in_step(
                                 if !curr_resources.contains_key(res.name().as_str()) {
                                     curr_resources.insert(res.name(), res.clone());
                                     parallel_to_get.push(res.as_get_resource().get());
-                                    if config.inputs.is_none() {
+                                    if new_config.inputs.is_none() {
                                         new_config.inputs =
                                             Some(vec![Input::new(res.name().as_str())]);
                                     } else {
-                                        let mut new_inputs = config.inputs.clone().unwrap();
+                                        let mut new_inputs = new_config.inputs.clone().unwrap();
                                         new_inputs.push(Input::new(res.name().as_str()));
                                         new_config.inputs = Some(new_inputs);
                                     }
                                 }
                             } else if let TaskResource::Output(ref output) = inp {
-                                if config.inputs.is_none() {
+                                if new_config.inputs.is_none() {
                                     new_config.inputs = Some(vec![Input::new(output.as_str())]);
                                 } else {
-                                    let mut new_inputs = config.inputs.clone().unwrap();
+                                    let mut new_inputs = new_config.inputs.clone().unwrap();
                                     new_inputs.push(Input::new(output.as_str()));
                                     new_config.inputs = Some(new_inputs);
                                 }
@@ -85,10 +85,10 @@ fn collect_resource_in_step(
                     if let Some(ref outputs) = outputs {
                         for out in outputs.iter() {
                             if let TaskResource::Output(ref out) = out {
-                                if config.outputs.is_none() {
+                                if new_config.outputs.is_none() {
                                     new_config.outputs = Some(vec![Output::new(out.as_str())])
                                 } else {
-                                    let mut new_outputs = config.outputs.clone().unwrap();
+                                    let mut new_outputs = new_config.outputs.clone().unwrap();
                                     new_outputs.push(Output::new(out.as_str()));
                                     new_config.outputs = Some(new_outputs);
                                 }
