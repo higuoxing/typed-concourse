@@ -1,6 +1,7 @@
 use crate::errors::Errors;
 use crate::pipeline::Pipeline;
 use crate::resource::Resource;
+use crate::resource::ResourceTypes;
 use crate::step::InParallel;
 use crate::step::Step;
 use crate::task::Input;
@@ -164,7 +165,20 @@ fn collect_resource(
 fn optimize_pipeline(pipeline: &Pipeline) -> Result<Pipeline, Errors> {
     let mut resource_collector = HashMap::new();
     let pipeline = collect_resource(pipeline, &mut resource_collector)?;
-    Ok(pipeline.with_resources(resource_collector.iter().map(|(_, v)| v.clone()).collect()))
+    Ok(pipeline
+        .with_resources(resource_collector.iter().map(|(_, v)| v.clone()).collect())
+        .with_resource_types(
+            resource_collector
+                .iter()
+                .filter_map(|(_, v)| {
+                    if let ResourceTypes::Custom { .. } = v.type_ {
+                        Some(v.type_.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect(),
+        ))
 }
 
 pub fn cook_pipeline(pipeline: &Pipeline) -> Result<String, Errors> {

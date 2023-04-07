@@ -9,8 +9,7 @@ use serde::Serialize;
 use serde::Serializer;
 use std::collections::HashMap;
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
-#[serde(rename_all = "kebab-case")]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ResourceTypes {
     DockerImage,
     Git,
@@ -19,11 +18,36 @@ pub enum ResourceTypes {
     Custom {
         name: String,
         type_: Box<ResourceTypes>,
-        #[serde(skip_serializing_if = "HashMap::is_empty")]
         source: Config,
-        #[serde(skip_serializing_if = "HashMap::is_empty")]
         params: Config,
     },
+}
+
+impl Serialize for ResourceTypes {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut state = serializer.serialize_struct("Resource", 5)?;
+        state.serialize_field("name", self.to_string().as_str())?;
+
+        match &self {
+            Self::Custom {
+                ref type_,
+                ref source,
+                ref params,
+                ..
+            } => {
+                state.serialize_field("type", type_.to_string().as_str())?;
+                if !source.is_empty() {
+                    state.serialize_field("source", source)?;
+                }
+                if !params.is_empty() {
+                    state.serialize_field("params", params)?;
+                }
+            }
+            _ => { /* Do nothing. */ }
+        }
+
+        state.end()
+    }
 }
 
 impl ResourceTypes {
@@ -117,7 +141,7 @@ impl Serialize for Resource {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut state = serializer.serialize_struct("Resource", 5)?;
         state.serialize_field("name", &self.name)?;
-        state.serialize_field("type", &self.type_)?;
+        state.serialize_field("type", self.resource_type().to_string().as_str())?;
         if self.icon.is_some() {
             state.serialize_field("icon", &self.icon)?;
         }
