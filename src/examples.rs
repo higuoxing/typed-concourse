@@ -4,7 +4,7 @@ mod examples {
         cook::{self, cook_pipeline},
         job::Job,
         pipeline::Pipeline,
-        resource::Resource,
+        resource::{Resource, ResourceTypes},
         task::{Command, Task, TaskResource},
     };
 
@@ -496,6 +496,57 @@ resources:
         - ./files/created_file
       inputs:
       - name: files
+"#
+        );
+    }
+
+    // https://concourse-ci.org/task-step.html
+    #[test]
+    fn generic_task_input_names() {
+        let repo = Resource::new("repo", &ResourceTypes::mock());
+        let repo_dev = Resource::new("repo-dev", &ResourceTypes::mock());
+        let ci = Resource::git("https://github.com/concourse/examples.git", "").with_name("ci");
+
+        let pipeline = Pipeline::new().append(
+            Job::new("task-input-mapping").then(
+                Task::from_file("ci/tasks/generic-inputs.yml")
+                    .with_name("list-inputs")
+                    .with_inputs(&[
+                        &ci.as_task_input_resource(),
+                        &repo.as_task_input_resource().map_to("main"),
+                        &repo_dev.as_task_input_resource().map_to("dev"),
+                    ])
+                    .to_step(),
+            ),
+        );
+
+        assert_eq!(
+            cook_pipeline(&pipeline).unwrap(),
+            r#"jobs:
+- name: task-input-mapping
+  plan:
+  - in_parallel:
+    - get: ci
+    - get: repo
+    - get: repo-dev
+  - task: list-inputs
+    file: ci/tasks/generic-inputs.yml
+    input_mapping:
+      dev: repo-dev
+      main: repo
+resources:
+- name: ci
+  type: git
+  icon: github
+  source:
+    uri: https://github.com/concourse/examples.git
+- name: repo-dev
+  type: mock
+- name: repo
+  type: mock
+resource_types:
+- name: mock
+  type: registry-image
 "#
         );
     }

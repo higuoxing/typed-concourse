@@ -125,6 +125,10 @@ impl ResourceTypes {
             ),
         }
     }
+
+    pub(crate) fn mock() -> Self {
+        ResourceTypes::new("mock", ResourceTypes::RegistryImage)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -156,11 +160,11 @@ impl Serialize for Resource {
 }
 
 impl Resource {
-    pub fn new(name: &str, res_type: ResourceTypes) -> Self {
+    pub fn new(name: &str, res_type: &ResourceTypes) -> Self {
         Self {
             name: name.to_string(),
             icon: None,
-            type_: res_type,
+            type_: res_type.clone(),
             source: HashMap::new(),
             trigger: false,
             version: None,
@@ -281,7 +285,11 @@ impl Resource {
     }
 
     pub fn as_task_input_resource(&self) -> TaskResource {
-        TaskResource::Resource(self.clone())
+        TaskResource::Resource {
+            resource: self.clone(),
+            get_as: None,
+            map_to: None,
+        }
     }
 
     pub fn as_task_image_resource(&self) -> TaskImageResource {

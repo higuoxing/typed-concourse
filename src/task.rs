@@ -99,6 +99,9 @@ pub struct TaskConfig {
     pub(crate) params: Option<EnvVars>,
     pub(crate) inputs: Option<Vec<Input>>,
     pub(crate) outputs: Option<Vec<Output>>,
+    // When both the 'image' tag in 'task' struct and 'image_resource' tag in
+    // the 'task_config' struct exist, we don't serialize the 'image_resource' tag,
+    // since the 'image' tag has higher priority.
     pub(crate) serialize_image_resource: bool,
 }
 
@@ -188,34 +191,102 @@ impl TaskConfig {
 
 #[derive(Debug, Clone)]
 pub enum TaskResource {
-    Unbound,
-    Resource(Resource),
-    Output(Identifier),
+    Unbound {
+        map_from: Option<String>,
+    },
+    Resource {
+        resource: Resource,
+        get_as: Option<String>,
+        map_to: Option<String>,
+    },
+    Output {
+        name: Identifier,
+        map_to: Option<String>,
+        map_from: Option<String>,
+    },
 }
 
 impl TaskResource {
     pub fn unbound() -> Self {
-        Self::Unbound
+        Self::Unbound { map_from: None }
+    }
+
+    pub fn map_from(&self, name: &str) -> Self {
+        match self {
+            Self::Unbound { .. } => Self::Unbound {
+                map_from: Some(name.to_string()),
+            },
+            _ => {
+                panic!("map_from() can only be used with ubound TaskResource")
+            }
+        }
+    }
+
+    pub fn get_as(&self, name: &str) -> TaskResource {
+        match &self {
+            Self::Resource {
+                ref resource,
+                ref map_to,
+                ..
+            } => Self::Resource {
+                resource: resource.clone(),
+                get_as: Some(name.to_string()),
+                map_to: map_to.clone(),
+            },
+            _ => {
+                panic!(
+                    "get_as() can only apply on TaskResource created from as_task_input_resource()"
+                )
+            }
+        }
+    }
+
+    pub fn map_to(&self, name: &str) -> TaskResource {
+        match &self {
+            Self::Resource {
+                ref resource,
+                ref get_as,
+                ..
+            } => Self::Resource {
+                resource: resource.clone(),
+                get_as: get_as.clone(),
+                map_to: Some(name.to_string()),
+            },
+            Self::Output {
+                ref name,
+                ref map_from,
+                ..
+            } => Self::Output {
+                name: name.clone(),
+                map_to: Some(name.to_string()),
+                map_from: map_from.clone(),
+            },
+            _ => panic!("map_to() cannot apply on unbound TaskResource"),
+        }
     }
 
     pub fn output(identifier: &str) -> Self {
-        Self::Output(identifier.to_string())
+        Self::Output {
+            name: identifier.to_string(),
+            map_to: None,
+            map_from: None,
+        }
     }
 }
 
 #[derive(Debug, Clone)]
 pub(crate) enum TaskDef {
-    File {
-        file: FilePath,
-        vars: Vars,
-    },
-    Config {
-        config: TaskConfig,
-        // Inputs shouldn't be serialized!!
-        inputs: Option<Vec<TaskResource>>,
-        // Outputs shouldn't be serialized!!
-        outputs: Option<Vec<TaskResource>>,
-    },
+    File { file: FilePath, vars: Vars },
+    Config { config: TaskConfig },
+}
+
+impl TaskDef {
+    pub(crate) fn is_from_file(&self) -> bool {
+        match self {
+            Self::File { .. } => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -226,9 +297,13 @@ pub struct Task {
     priviledged: bool,
     // TODO: container-limit.
     params: Option<EnvVars>,
-    input_mapping: Option<HashMap<String, String>>,
-    output_mapping: Option<HashMap<String, String>>,
+    pub(crate) input_mapping: Option<HashMap<String, String>>,
+    pub(crate) output_mapping: Option<HashMap<String, String>>,
 
+    // Inputs shouldn't be serialized!!
+    pub(crate) inputs: Option<Vec<TaskResource>>,
+    // Outputs shouldn't be serialized!!
+    pub(crate) outputs: Option<Vec<TaskResource>>,
     // Hooks.
     on_failure: Option<Box<Step>>,
     on_abort: Option<Box<Step>>,
@@ -247,7 +322,9 @@ impl Serialize for Task {
                 config.serialize_image_resource = self.image.is_none();
                 state.serialize_field("config", &config)?;
             }
-            TaskDef::File { .. } => {}
+            TaskDef::File { ref file, .. } => {
+                state.serialize_field("file", file)?;
+            }
         }
 
         if let Some(ref image) = self.image.as_ref() {
@@ -288,14 +365,34 @@ impl Task {
             task: Generator::default().next().unwrap(),
             task_def: TaskDef::Config {
                 config: TaskConfig::linux_default(),
-                inputs: None,
-                outputs: None,
             },
             image: None,
             priviledged: false,
             params: None,
             input_mapping: None,
             output_mapping: None,
+            inputs: None,
+            outputs: None,
+            on_abort: None,
+            on_failure: None,
+            on_success: None,
+        }
+    }
+
+    pub fn from_file(file: &str) -> Task {
+        Self {
+            task: Generator::default().next().unwrap(),
+            task_def: TaskDef::File {
+                file: file.to_string(),
+                vars: HashMap::new(),
+            },
+            image: None,
+            priviledged: false,
+            params: None,
+            input_mapping: None,
+            output_mapping: None,
+            inputs: None,
+            outputs: None,
             on_abort: None,
             on_failure: None,
             on_success: None,
@@ -320,18 +417,12 @@ impl Task {
                 ".run() cannot be called in 'task' ('{}') that is initialized from 'file'.",
                 self.task.as_str()
             ),
-            TaskDef::Config {
-                ref config,
-                ref inputs,
-                ref outputs,
-            } => {
+            TaskDef::Config { ref config } => {
                 let mut this = self.clone();
                 let mut this_config = config.clone();
                 this_config.run = command.clone();
                 this.task_def = TaskDef::Config {
                     config: this_config,
-                    inputs: inputs.clone(),
-                    outputs: outputs.clone(),
                 };
                 this
             }
@@ -349,16 +440,12 @@ impl Task {
             TaskDef::File { .. } => panic!(".with_image_resource() cannot be called in 'task' ('{}') that is initialized from 'file'.", self.task.as_str()),
             TaskDef::Config {
                 ref config,
-                ref inputs,
-                ref outputs,
             } => {
                 let mut this_config = config.clone();
                 this_config.image_resource = image_resource;
                 let mut this = self.clone();
                 this.task_def = TaskDef::Config {
                     config: this_config,
-                    inputs: inputs.clone(),
-                    outputs: outputs.clone(),
                 };
                 this
             }
@@ -377,55 +464,120 @@ impl Task {
     }
 
     pub fn with_inputs(&self, inputs: &[&TaskResource]) -> Self {
-        match self.task_def {
-            TaskDef::File { .. } => panic!(
-                ".with_inputs() cannot be called in 'task' ('{}') that is initialized from 'file'.",
-                self.task.as_str()
-            ),
-            TaskDef::Config {
-                ref config,
-                ref outputs,
-                ..
-            } => {
-                let mut this = self.clone();
-                this.task_def = TaskDef::Config {
-                    config: config.clone(),
-                    inputs: Some(
-                        inputs
-                            .iter()
-                            .map(|inp| inp.clone().clone())
-                            .collect::<Vec<TaskResource>>(),
-                    ),
-                    outputs: outputs.clone(),
-                };
-                this
-            }
+        let mut this = self.clone();
+
+        this.inputs = Some(
+            inputs
+                .iter()
+                .map(|inp| inp.clone().clone())
+                .collect::<Vec<TaskResource>>(),
+        );
+
+        let input_mapping = if !self.task_def.is_from_file() {
+            inputs
+                .iter()
+                .filter_map(|inp| match *inp {
+                    TaskResource::Resource {
+                        ref resource,
+                        ref map_to,
+                        ref get_as,
+                    } => {
+                        if let Some(ref map_to_name) = map_to {
+                            if let Some(ref get_as_name) = get_as {
+                                Some((map_to_name.clone(), get_as_name.clone()))
+                            } else {
+                                Some((map_to_name.clone(), resource.name.clone()))
+                            }
+                        } else {
+                            None
+                        }
+                    }
+                    TaskResource::Output {
+                        ref name,
+                        ref map_to,
+                        ..
+                    } => {
+                        if let Some(ref map_to_name) = map_to {
+                            Some((map_to_name.clone(), name.clone()))
+                        } else {
+                            None
+                        }
+                    }
+                    _ => {
+                        panic!("Cannot pass unbound TaskResource to with_inputs()");
+                    }
+                })
+                .collect::<HashMap<String, String>>()
+        } else {
+            inputs
+                .iter()
+                .filter_map(|ref inp| match *inp {
+                    TaskResource::Resource {
+                        ref resource,
+                        ref get_as,
+                        ref map_to,
+                    } => {
+                        if let Some(ref map_to_name) = map_to {
+                            if let Some(ref get_as_name) = get_as {
+                                Some((map_to_name.clone(), get_as_name.clone()))
+                            } else {
+                                Some((map_to_name.clone(), resource.name().clone()))
+                            }
+                        } else {
+                            None
+                        }
+                    }
+                    TaskResource::Output {
+                        ref name,
+                        ref map_to,
+                        ..
+                    } => {
+                        if let Some(ref map_to_name) = map_to {
+                            Some((map_to_name.clone(), name.clone()))
+                        } else {
+                            None
+                        }
+                    }
+                    TaskResource::Unbound { .. } => {
+                        panic!("Cannot pass unbound TaskResource to with_inputs()");
+                    }
+                })
+                .collect::<HashMap<String, String>>()
+        };
+
+        if !input_mapping.is_empty() {
+            this.input_mapping = Some(input_mapping);
         }
+
+        this
     }
 
     pub fn bind_outputs(&self, outputs: &mut [(&str, &mut TaskResource)]) -> Self {
-        match self.task_def {
-            TaskDef::File { .. } => panic!(
-                ".bind_outputs() cannot be called in 'task' ('{}') that is initialized from 'file'.",
-                self.task.as_str()
-            ),
-            TaskDef::Config { ref config, ref inputs, .. } => {
-                let mut this = self.clone();
-		if outputs.is_empty() {
-		    this
-		} else {
-                    let outputs = outputs.iter_mut().map(|(k, v)| {
-			**v   = TaskResource::Output(k.to_string());
-			v.clone()
-                    }).collect::<Vec<TaskResource>>();
-                    this.task_def = TaskDef::Config {
-			config: config.clone(),
-			inputs: inputs.clone(),
-			outputs: Some(outputs),
-                    };
-                    this
-		}
-            }
+        let mut this = self.clone();
+        if outputs.is_empty() {
+            this
+        } else {
+            let mut output_mapping = HashMap::new();
+            let outputs = outputs
+                .iter_mut()
+                .map(|(k, v)| match v.clone() {
+                    TaskResource::Unbound { ref map_from } => {
+                        **v = TaskResource::Output {
+                            name: k.to_string(),
+                            map_to: None,
+                            map_from: map_from.clone(),
+                        };
+
+                        if let Some(ref map_from_name) = map_from {
+                            output_mapping.insert(map_from_name.clone(), k.to_string());
+                        }
+                        v.clone()
+                    }
+                    _ => panic!("Only unbound TaskResource can be used in bind_outputs()"),
+                })
+                .collect::<Vec<TaskResource>>();
+            this.outputs = Some(outputs);
+            this
         }
     }
 
@@ -437,14 +589,10 @@ impl Task {
             TaskDef::File { .. } => panic!(".mutate_task_config() cannot be called in 'task' ('{}') that is initialized from 'file'.", self.task.as_str()),
             TaskDef::Config {
                 ref config,
-                ref inputs,
-                ref outputs,
             } => {
                 let mut this = self.clone();
                 this.task_def = TaskDef::Config {
                     config: task_config_mutator(config),
-                    inputs: inputs.clone(),
-                    outputs: outputs.clone(),
                 };
                 this
             }

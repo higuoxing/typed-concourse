@@ -45,75 +45,72 @@ fn collect_resource_in_step(
         },
         Step::Put(..) => {}
         Step::Task(ref task_step) => {
+            let mut inputs_for_new_config = vec![];
+            let mut outputs_for_new_config = vec![];
+            // 1. Check if we need to get resource for inputs.
+            if let Some(ref inputs) = task_step.inputs {
+                for inp in inputs.iter() {
+                    if let TaskResource::Resource {
+                        ref resource,
+                        ref get_as,
+                        ..
+                    } = inp
+                    {
+                        if !curr_resources.contains_key(resource.name().as_str()) {
+                            curr_resources.insert(resource.name(), resource.clone());
+                            match get_as {
+                                Some(ref get_as_name) => parallel_to_get
+                                    .push(resource.as_get_resource().get_as(get_as_name.as_str())),
+                                None => parallel_to_get.push(resource.as_get_resource().get()),
+                            }
+
+                            inputs_for_new_config.push(Input::new(resource.name().as_str()));
+                        }
+                    } else if let TaskResource::Output { ref name, .. } = inp {
+                        inputs_for_new_config.push(Input::new(name.as_str()));
+                    }
+                }
+            }
+
+            // Append outputs to task_config.
+            if let Some(ref outputs) = task_step.outputs {
+                for out in outputs.iter() {
+                    if let TaskResource::Output { ref name, .. } = out {
+                        outputs_for_new_config.push(Output::new(name.as_str()));
+                    }
+                }
+            }
+
             match task_step.task_def {
-                TaskDef::File { .. } => { /* Do nothing. */ }
-                TaskDef::Config {
-                    ref config,
-                    ref inputs,
-                    ref outputs,
-                } => {
-                    let mut new_config = config.clone();
-                    // 1. Check if we need to get resource for inputs.
-                    if let Some(ref inputs) = inputs {
-                        for inp in inputs.iter() {
-                            if let TaskResource::Resource(ref res) = inp {
-                                if !curr_resources.contains_key(res.name().as_str()) {
-                                    curr_resources.insert(res.name(), res.clone());
-                                    parallel_to_get.push(res.as_get_resource().get());
-                                    if new_config.inputs.is_none() {
-                                        new_config.inputs =
-                                            Some(vec![Input::new(res.name().as_str())]);
-                                    } else {
-                                        let mut new_inputs = new_config.inputs.clone().unwrap();
-                                        new_inputs.push(Input::new(res.name().as_str()));
-                                        new_config.inputs = Some(new_inputs);
-                                    }
-                                }
-                            } else if let TaskResource::Output(ref output) = inp {
-                                if new_config.inputs.is_none() {
-                                    new_config.inputs = Some(vec![Input::new(output.as_str())]);
-                                } else {
-                                    let mut new_inputs = new_config.inputs.clone().unwrap();
-                                    new_inputs.push(Input::new(output.as_str()));
-                                    new_config.inputs = Some(new_inputs);
-                                }
-                            }
-                        }
-                    }
-
-                    // Append outputs to task_config.
-                    if let Some(ref outputs) = outputs {
-                        for out in outputs.iter() {
-                            if let TaskResource::Output(ref out) = out {
-                                if new_config.outputs.is_none() {
-                                    new_config.outputs = Some(vec![Output::new(out.as_str())])
-                                } else {
-                                    let mut new_outputs = new_config.outputs.clone().unwrap();
-                                    new_outputs.push(Output::new(out.as_str()));
-                                    new_config.outputs = Some(new_outputs);
-                                }
-                            }
-                        }
-                    }
-
+                TaskDef::File { .. } => { /* Do nothing??? */ }
+                TaskDef::Config { .. } => {
                     adjusted_step =
-                        Step::Task(task_step.clone().mutate_task_config(|_| new_config.clone()));
+                        Step::Task(task_step.clone().mutate_task_config(|task_config| {
+                            let mut new_task_config = task_config.clone();
+                            if !inputs_for_new_config.is_empty() {
+                                new_task_config.inputs = Some(inputs_for_new_config.clone());
+                            }
+                            if !outputs_for_new_config.is_empty() {
+                                new_task_config.outputs = Some(outputs_for_new_config.clone());
+                            }
+                            new_task_config
+                        }));
+                }
+            }
 
-                    // 2. Check if we need to get resource for task.image.
-                    if let Some(image) = task_step.image.as_ref() {
-                        if !curr_resources.contains_key(image.resource.name.as_str()) {
-                            curr_resources.insert(image.resource.name(), image.resource.clone());
-                            parallel_to_get.push(
-                                task_step
-                                    .image
-                                    .as_ref()
-                                    .unwrap()
-                                    .resource
-                                    .as_get_resource()
-                                    .get(),
-                            );
-                        }
-                    }
+            // 2. Check if we need to get resource for task.image.
+            if let Some(image) = task_step.image.as_ref() {
+                if !curr_resources.contains_key(image.resource.name.as_str()) {
+                    curr_resources.insert(image.resource.name(), image.resource.clone());
+                    parallel_to_get.push(
+                        task_step
+                            .image
+                            .as_ref()
+                            .unwrap()
+                            .resource
+                            .as_get_resource()
+                            .get(),
+                    );
                 }
             }
         }
@@ -172,11 +169,14 @@ fn optimize_pipeline(pipeline: &Pipeline) -> Result<Pipeline, Errors> {
                 .iter()
                 .filter_map(|(_, v)| {
                     if let ResourceTypes::Custom { .. } = v.type_ {
-                        Some(v.type_.clone())
+                        Some((v.type_.to_string(), v.type_.clone()))
                     } else {
                         None
                     }
                 })
+                .collect::<HashMap<String, ResourceTypes>>()
+                .into_iter()
+                .map(|(_, v)| v.clone())
                 .collect(),
         ))
 }
