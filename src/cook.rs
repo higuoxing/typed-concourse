@@ -19,6 +19,9 @@ fn collect_resource_in_step(
     let mut adjusted_step = step.clone();
     let mut parallel_to_get = vec![];
     match step {
+        Step::Try(ref try_step) => {
+            collect_resource_in_step(try_step.try_.as_ref(), curr_resources, resource_collector)?;
+        }
         Step::Get(ref get_step) => {
             curr_resources.insert(get_step.get.clone(), get_step.resource.clone());
         }

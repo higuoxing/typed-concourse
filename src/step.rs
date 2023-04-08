@@ -29,6 +29,19 @@ impl Serialize for InParallel {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct Try {
+    pub(crate) try_: Box<Step>,
+}
+
+impl Serialize for Try {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut state = serializer.serialize_struct("Try", 1)?;
+        state.serialize_field("try", self.try_.as_ref())?;
+        state.end()
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum Step {
@@ -36,4 +49,13 @@ pub enum Step {
     Put(Put),
     Task(Task),
     InParallel(InParallel),
+    Try(Try),
+}
+
+impl Step {
+    pub fn try_(step: Step) -> Self {
+        Self::Try(Try {
+            try_: Box::new(step),
+        })
+    }
 }

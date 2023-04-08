@@ -1,6 +1,7 @@
 use crate::schema::Identifier;
 use crate::step::InParallel;
 use crate::step::Step;
+use crate::step::Try;
 use serde::Serialize;
 
 #[derive(Debug, Clone)]
@@ -81,6 +82,14 @@ impl Job {
     pub fn then(&self, step: Step) -> Self {
         let mut this = self.clone();
         this.plan.push(step);
+        this
+    }
+
+    pub fn try_(&self, step: Step) -> Self {
+        let mut this = self.clone();
+        this.plan.push(Step::Try(Try {
+            try_: Box::new(step),
+        }));
         this
     }
 

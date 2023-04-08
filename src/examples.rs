@@ -5,6 +5,7 @@ mod examples {
         job::Job,
         pipeline::Pipeline,
         resource::{Resource, ResourceTypes},
+        step::Step,
         task::{Command, Task, TaskResource},
     };
 
@@ -645,6 +646,42 @@ resources:
 resource_types:
 - name: mock
   type: registry-image
+"#
+        );
+    }
+
+    // https://concourse-ci.org/try-step.html
+    #[test]
+    fn try_step() {
+        let test_logs = Resource::new("test-logs", &mock_resource_type());
+        let pipeline = Pipeline::new().append(
+            Job::new("dummy-job").then(
+                Task::new()
+                    .with_name("run-tests")
+                    .on_success(Step::try_(test_logs.as_put_resource().put()))
+                    .to_step(),
+            ),
+        );
+
+        assert_eq!(
+            cook_pipeline(&pipeline).unwrap(),
+            r#"jobs:
+- name: dummy-job
+  plan:
+  - task: run-tests
+    config:
+      platform: linux
+      image_resource:
+        type: registry-image
+        source:
+          repository: busybox
+      run:
+        path: echo
+        args:
+        - hello, world!
+    on_success:
+      try:
+        put: test-logs
 "#
         );
     }
