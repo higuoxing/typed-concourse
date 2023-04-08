@@ -23,7 +23,11 @@ fn collect_resource_in_step(
             collect_resource_in_step(try_step.try_.as_ref(), curr_resources, resource_collector)?;
         }
         Step::Get(ref get_step) => {
-            curr_resources.insert(get_step.get.clone(), get_step.resource.clone());
+            if get_step.get.is_empty() {
+                curr_resources.insert(get_step.resource.name.clone(), get_step.resource.clone());
+            } else {
+                curr_resources.insert(get_step.get.clone(), get_step.resource.clone());
+            }
         }
         Step::InParallel(ref in_parallel) => match in_parallel {
             InParallel::Steps(ref steps) => {
@@ -46,7 +50,14 @@ fn collect_resource_in_step(
             }
             _ => {}
         },
-        Step::Put(..) => {}
+        Step::Put(ref put_step) => {
+            if put_step.put.is_empty() {
+                resource_collector
+                    .insert(put_step.resource.name.clone(), put_step.resource.clone());
+            } else {
+                resource_collector.insert(put_step.put.clone(), put_step.resource.clone());
+            }
+        }
         Step::Task(ref task_step) => {
             let mut inputs_for_new_config = vec![];
             let mut outputs_for_new_config = vec![];
@@ -115,6 +126,17 @@ fn collect_resource_in_step(
                             .get(),
                     );
                 }
+            }
+
+            // 3. Check task hooks.
+            if let Some(ref on_failure) = task_step.on_failure.as_ref() {
+                collect_resource_in_step(on_failure.as_ref(), curr_resources, resource_collector)?;
+            }
+            if let Some(ref on_abort) = task_step.on_abort.as_ref() {
+                collect_resource_in_step(on_abort.as_ref(), curr_resources, resource_collector)?;
+            }
+            if let Some(ref on_success) = task_step.on_failure.as_ref() {
+                collect_resource_in_step(on_success.as_ref(), curr_resources, resource_collector)?;
             }
         }
     }

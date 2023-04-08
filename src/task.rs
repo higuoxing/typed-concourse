@@ -313,9 +313,9 @@ pub struct Task {
     // Outputs shouldn't be serialized!!
     pub(crate) outputs: Option<Vec<TaskResource>>,
     // Hooks.
-    on_failure: Option<Box<Step>>,
-    on_abort: Option<Box<Step>>,
-    on_success: Option<Box<Step>>,
+    pub(crate) on_failure: Option<Box<Step>>,
+    pub(crate) on_abort: Option<Box<Step>>,
+    pub(crate) on_success: Option<Box<Step>>,
 }
 
 impl Serialize for Task {

@@ -641,6 +641,8 @@ resource_types:
     params:
       file: the-ice/verison.txt
 resources:
+- name: cyberdeck
+  type: mock
 - name: the-ice
   type: mock
 resource_types:
