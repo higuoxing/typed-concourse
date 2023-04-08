@@ -612,4 +612,40 @@ resource_types:
 "#
         );
     }
+
+    // https://concourse-ci.org/put-step.html
+    #[test]
+    fn getting_and_putting() {
+        let the_ice = Resource::new("the-ice", &mock_resource_type());
+        let cyberdeck = Resource::new("cyberdeck", &mock_resource_type());
+
+        let pipeline = Pipeline::new().append(
+            Job::new("get-and-pull")
+                .then(the_ice.as_get_resource().get())
+                .then(
+                    cyberdeck
+                        .as_put_resource()
+                        .with_params(&[("file", "the-ice/verison.txt")])
+                        .put(),
+                ),
+        );
+
+        assert_eq!(
+            cook_pipeline(&pipeline).unwrap(),
+            r#"jobs:
+- name: get-and-pull
+  plan:
+  - get: the-ice
+  - put: cyberdeck
+    params:
+      file: the-ice/verison.txt
+resources:
+- name: the-ice
+  type: mock
+resource_types:
+- name: mock
+  type: registry-image
+"#
+        );
+    }
 }

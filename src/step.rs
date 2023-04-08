@@ -1,17 +1,10 @@
 use crate::get::Get;
-use crate::schema::Identifier;
+use crate::put::Put;
 use crate::schema::Number;
 use crate::task::Task;
 use serde::ser::SerializeStruct;
 use serde::Serialize;
 use serde::Serializer;
-
-#[derive(Debug, Clone, Serialize)]
-pub struct Put {
-    put: Identifier,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    resource: Option<Identifier>,
-}
 
 #[derive(Debug, Clone)]
 pub enum InParallel {

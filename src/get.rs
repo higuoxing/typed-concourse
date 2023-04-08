@@ -51,7 +51,7 @@ impl Serialize for Get {
 }
 
 impl Get {
-    pub fn from(identifier: &str, resource: &Resource, version: Option<Version>) -> Self {
+    pub(crate) fn from(identifier: &str, resource: &Resource, version: Option<Version>) -> Self {
         Self {
             get: identifier.to_string(),
             resource: resource.clone(),
@@ -76,10 +76,6 @@ impl Get {
         let mut this = self.clone();
         this.passed = Some(jobs.to_vec());
         this
-    }
-
-    pub fn resource(&self) -> &Resource {
-        &self.resource
     }
 
     pub fn get(&self) -> Step {

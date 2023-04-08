@@ -1,4 +1,5 @@
 use crate::get::Get;
+use crate::put::Put;
 use crate::schema::Config;
 use crate::schema::Identifier;
 use crate::schema::Version;
@@ -278,6 +279,10 @@ impl Resource {
 
     pub fn as_get_resource(&self) -> Get {
         Get::from("", self, None)
+    }
+
+    pub fn as_put_resource(&self) -> Put {
+        Put::from("", self)
     }
 
     pub fn as_task_input_resource(&self) -> TaskResource {
