@@ -6,8 +6,6 @@
 
 - Type-safe configuration: `typed-concourse` provides a type-safe way to define your Concourse pipelines and tasks, ensuring that your configuration is correct at compile-time.
 
-- Rust-based DSL: With `typed-concourse`, you can define your Concourse configuration using a Rust-based domain-specific language (DSL). This makes it easy to write and maintain complex configurations in a language you already know and love.
-
 - Intuitive API: The API for `typed-concourse` is designed to be intuitive and easy to use. Whether you're a seasoned Rust developer or new to the language, you'll be able to use `typed-concourse` to create your Concourse pipelines and tasks quickly and easily.
 
 - Code indention: When writing configurations in YAML/YAML generator, you still need to carefully indent your codes or the parser cannot parse it correctly. With `typed-concourse`, you can write configuration in the Rust language and your IDE/editor will take care of it!
