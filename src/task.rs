@@ -10,7 +10,7 @@ use names::Generator;
 use serde::ser::SerializeStruct;
 use serde::Serialize;
 use serde::Serializer;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 #[derive(Debug, Copy, Clone, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -191,9 +191,7 @@ impl TaskConfig {
 
 #[derive(Debug, Clone)]
 pub enum TaskResource {
-    Unbound {
-        map_from: Option<String>,
-    },
+    Unbound,
     Resource {
         resource: Resource,
         get_as: Option<String>,
@@ -208,16 +206,22 @@ pub enum TaskResource {
 
 impl TaskResource {
     pub fn unbound() -> Self {
-        Self::Unbound { map_from: None }
+        Self::Unbound
     }
 
-    pub fn map_from(&self, name: &str) -> Self {
+    pub fn map_from(&self, map_from_name: &str) -> Self {
         match self {
-            Self::Unbound { .. } => Self::Unbound {
-                map_from: Some(name.to_string()),
+            Self::Output {
+                ref name,
+                ref map_to,
+                ..
+            } => Self::Output {
+                name: name.clone(),
+                map_from: Some(map_from_name.to_string()),
+                map_to: map_to.clone(),
             },
             _ => {
-                panic!("map_from() can only be used with ubound TaskResource")
+                panic!("map_from() can only be used with 'Output' TaskResource")
             }
         }
     }
@@ -265,6 +269,11 @@ impl TaskResource {
         }
     }
 
+    pub fn bind(&self, to: &mut Self) -> Self {
+        *to = self.clone();
+        self.clone()
+    }
+
     pub fn output(identifier: &str) -> Self {
         Self::Output {
             name: identifier.to_string(),
@@ -297,8 +306,8 @@ pub struct Task {
     priviledged: bool,
     // TODO: container-limit.
     params: Option<EnvVars>,
-    pub(crate) input_mapping: Option<HashMap<String, String>>,
-    pub(crate) output_mapping: Option<HashMap<String, String>>,
+    pub(crate) input_mapping: Option<BTreeMap<String, String>>,
+    pub(crate) output_mapping: Option<BTreeMap<String, String>>,
 
     // Inputs shouldn't be serialized!!
     pub(crate) inputs: Option<Vec<TaskResource>>,
@@ -384,7 +393,7 @@ impl Task {
             task: Generator::default().next().unwrap(),
             task_def: TaskDef::File {
                 file: file.to_string(),
-                vars: HashMap::new(),
+                vars: BTreeMap::new(),
             },
             image: None,
             priviledged: false,
@@ -507,7 +516,7 @@ impl Task {
                         panic!("Cannot pass unbound TaskResource to with_inputs()");
                     }
                 })
-                .collect::<HashMap<String, String>>()
+                .collect::<BTreeMap<String, String>>()
         } else {
             inputs
                 .iter()
@@ -542,7 +551,7 @@ impl Task {
                         panic!("Cannot pass unbound TaskResource to with_inputs()");
                     }
                 })
-                .collect::<HashMap<String, String>>()
+                .collect::<BTreeMap<String, String>>()
         };
 
         if !input_mapping.is_empty() {
@@ -552,31 +561,34 @@ impl Task {
         this
     }
 
-    pub fn bind_outputs(&self, outputs: &mut [(&str, &mut TaskResource)]) -> Self {
-        let mut this = self.clone();
+    pub fn with_outputs(&self, outputs: &[&TaskResource]) -> Self {
         if outputs.is_empty() {
-            this
+            self.clone()
         } else {
-            let mut output_mapping = HashMap::new();
+            let mut this = self.clone();
+            let mut output_mapping = BTreeMap::new();
             let outputs = outputs
-                .iter_mut()
-                .map(|(k, v)| match v.clone() {
-                    TaskResource::Unbound { ref map_from } => {
-                        **v = TaskResource::Output {
-                            name: k.to_string(),
-                            map_to: None,
-                            map_from: map_from.clone(),
-                        };
-
+                .iter()
+                .map(|v| match **v {
+                    TaskResource::Output {
+                        ref name,
+                        ref map_from,
+                        ..
+                    } => {
                         if let Some(ref map_from_name) = map_from {
-                            output_mapping.insert(map_from_name.clone(), k.to_string());
+                            output_mapping.insert(map_from_name.clone(), name.clone());
                         }
-                        v.clone()
+                        v.clone().clone()
                     }
-                    _ => panic!("Only unbound TaskResource can be used in bind_outputs()"),
+                    _ => panic!("Only 'Output' TaskResource can be used in with_outputs()"),
                 })
                 .collect::<Vec<TaskResource>>();
             this.outputs = Some(outputs);
+            this.output_mapping = if !output_mapping.is_empty() {
+                Some(output_mapping)
+            } else {
+                None
+            };
             this
         }
     }

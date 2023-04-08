@@ -9,12 +9,12 @@ use crate::task::Output;
 use crate::task::TaskDef;
 use crate::task::TaskResource;
 use serde_yaml;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 fn collect_resource_in_step(
     step: &Step,
-    curr_resources: &mut HashMap<String, Resource>,
-    resource_collector: &mut HashMap<String, Resource>,
+    curr_resources: &mut BTreeMap<String, Resource>,
+    resource_collector: &mut BTreeMap<String, Resource>,
 ) -> Result<Vec<Step>, Errors> {
     let mut adjusted_step = step.clone();
     let mut parallel_to_get = vec![];
@@ -24,7 +24,7 @@ fn collect_resource_in_step(
         }
         Step::InParallel(ref in_parallel) => match in_parallel {
             InParallel::Steps(ref steps) => {
-                let mut temp_curr_resources = HashMap::new();
+                let mut temp_curr_resources = BTreeMap::new();
                 let mut adjusted_parallel_steps = vec![];
                 for parallel_step in steps.iter() {
                     adjusted_parallel_steps.append(&mut collect_resource_in_step(
@@ -133,7 +133,7 @@ fn collect_resource_in_step(
 
 fn collect_resource(
     pipeline: &Pipeline,
-    resource_collector: &mut HashMap<String, Resource>,
+    resource_collector: &mut BTreeMap<String, Resource>,
 ) -> Result<Pipeline, Errors> {
     let mut adjusted_pipeline = pipeline.clone();
     // Reset the plan, since we will reconstruct it.
@@ -145,7 +145,7 @@ fn collect_resource(
         // Reset the plan, since we will reconstruct it.
         curr_job.plan = vec![];
 
-        let mut curr_resources = HashMap::new();
+        let mut curr_resources = BTreeMap::new();
         for step in job.plan.iter() {
             let mut adjusted_steps =
                 collect_resource_in_step(step, &mut curr_resources, resource_collector)?;
@@ -160,7 +160,7 @@ fn collect_resource(
 }
 
 fn optimize_pipeline(pipeline: &Pipeline) -> Result<Pipeline, Errors> {
-    let mut resource_collector = HashMap::new();
+    let mut resource_collector = BTreeMap::new();
     let pipeline = collect_resource(pipeline, &mut resource_collector)?;
     Ok(pipeline
         .with_resources(resource_collector.iter().map(|(_, v)| v.clone()).collect())
@@ -174,7 +174,7 @@ fn optimize_pipeline(pipeline: &Pipeline) -> Result<Pipeline, Errors> {
                         None
                     }
                 })
-                .collect::<HashMap<String, ResourceTypes>>()
+                .collect::<BTreeMap<String, ResourceTypes>>()
                 .into_iter()
                 .map(|(_, v)| v.clone())
                 .collect(),

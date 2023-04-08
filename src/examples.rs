@@ -452,7 +452,7 @@ resources:
                                 "ls -la; echo \"Create a file on $(date)\" > ./files/created_file",
                             ],
                         ))
-                        .bind_outputs(&mut [("files", &mut files)])
+                        .with_outputs(&[&TaskResource::output("files").bind(&mut files)])
                         .to_step(),
                 )
                 .then(
@@ -502,7 +502,7 @@ resources:
 
     // https://concourse-ci.org/task-step.html
     #[test]
-    fn generic_task_input_names() {
+    fn input_mapping() {
         let repo = Resource::new("repo", &ResourceTypes::mock());
         let repo_dev = Resource::new("repo-dev", &ResourceTypes::mock());
         let ci = Resource::git("https://github.com/concourse/examples.git", "").with_name("ci");
@@ -540,9 +540,67 @@ resources:
   icon: github
   source:
     uri: https://github.com/concourse/examples.git
+- name: repo
+  type: mock
 - name: repo-dev
   type: mock
+resource_types:
+- name: mock
+  type: registry-image
+"#
+        );
+    }
+
+    // https://concourse-ci.org/task-step.html
+    #[test]
+    fn output_mapping() {
+        let repo = Resource::new("repo", &ResourceTypes::mock());
+        let repo_dev = Resource::new("repo-dev", &ResourceTypes::mock());
+        let ci = Resource::git("https://github.com/concourse/examples.git", "").with_name("ci");
+
+        let pipeline = Pipeline::new().append(
+            Job::new("task_output_mapping").then(
+                Task::from_file("ci/tasks/generic-outputs.yml")
+                    .with_name("create-outputs")
+                    .with_inputs(&[
+                        &repo.as_task_input_resource().map_to("main"),
+                        &repo_dev.as_task_input_resource().map_to("dev"),
+                        &ci.as_task_input_resource(),
+                    ])
+                    .with_outputs(&[
+                        &TaskResource::output("repo").map_from("main"),
+                        &TaskResource::output("repo-dev").map_from("dev"),
+                    ])
+                    .to_step(),
+            ),
+        );
+
+        assert_eq!(
+            cook_pipeline(&pipeline).unwrap(),
+            r#"jobs:
+- name: task_output_mapping
+  plan:
+  - in_parallel:
+    - get: repo
+    - get: repo-dev
+    - get: ci
+  - task: create-outputs
+    file: ci/tasks/generic-outputs.yml
+    input_mapping:
+      dev: repo-dev
+      main: repo
+    output_mapping:
+      dev: repo-dev
+      main: repo
+resources:
+- name: ci
+  type: git
+  icon: github
+  source:
+    uri: https://github.com/concourse/examples.git
 - name: repo
+  type: mock
+- name: repo-dev
   type: mock
 resource_types:
 - name: mock

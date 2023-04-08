@@ -7,7 +7,7 @@ use git_url_parse::GitUrl;
 use serde::ser::SerializeStruct;
 use serde::Serialize;
 use serde::Serializer;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ResourceTypes {
@@ -65,8 +65,8 @@ impl ResourceTypes {
         Self::Custom {
             name: name.to_string(),
             type_: Box::new(type_),
-            source: HashMap::new(),
-            params: HashMap::new(),
+            source: BTreeMap::new(),
+            params: BTreeMap::new(),
         }
     }
 
@@ -165,7 +165,7 @@ impl Resource {
             name: name.to_string(),
             icon: None,
             type_: res_type.clone(),
-            source: HashMap::new(),
+            source: BTreeMap::new(),
             trigger: false,
             version: None,
         }
@@ -179,7 +179,7 @@ impl Resource {
         let git_url = GitUrl::parse(uri)
             .expect(format!("The URI of given git resource '{}' is not valid", uri).as_str());
 
-        let mut source = HashMap::new();
+        let mut source = BTreeMap::new();
         source.insert(String::from("uri"), uri.to_string());
         if branch != "" {
             source.insert(String::from("branch"), branch.to_string());
