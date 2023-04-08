@@ -1,12 +1,16 @@
 #[cfg(test)]
 mod examples {
     use crate::{
-        cook::{self, cook_pipeline},
+        cook::cook_pipeline,
         job::Job,
         pipeline::Pipeline,
         resource::{Resource, ResourceTypes},
         task::{Command, Task, TaskResource},
     };
+
+    fn mock_resource_type() -> ResourceTypes {
+        ResourceTypes::new("mock", ResourceTypes::RegistryImage)
+    }
 
     // https://concourse-ci.org/hello-world-example.html
     #[test]
@@ -21,7 +25,7 @@ mod examples {
         );
 
         assert_eq!(
-            cook::cook_pipeline(&pipeline).unwrap().as_str(),
+            cook_pipeline(&pipeline).unwrap().as_str(),
             r#"jobs:
 - name: job
   public: true
@@ -56,7 +60,7 @@ mod examples {
         );
 
         assert_eq!(
-            cook::cook_pipeline(&pipeline).unwrap().as_str(),
+            cook_pipeline(&pipeline).unwrap().as_str(),
             r#"jobs:
 - name: job
   public: true
@@ -101,7 +105,7 @@ mod examples {
             );
 
         assert_eq!(
-            cook::cook_pipeline(&pipeline).unwrap().as_str(),
+            cook_pipeline(&pipeline).unwrap().as_str(),
             r#"jobs:
 - name: ((first))-job
   public: true
@@ -152,7 +156,7 @@ mod examples {
         );
 
         assert_eq!(
-            cook::cook_pipeline(&pipeline).unwrap().as_str(),
+            cook_pipeline(&pipeline).unwrap().as_str(),
             r#"jobs:
 - name: job
   public: true
@@ -197,7 +201,7 @@ resources:
         );
 
         assert_eq!(
-            cook::cook_pipeline(&pipeline).unwrap(),
+            cook_pipeline(&pipeline).unwrap(),
             r#"jobs:
 - name: job
   plan:
@@ -503,8 +507,8 @@ resources:
     // https://concourse-ci.org/task-step.html
     #[test]
     fn input_mapping() {
-        let repo = Resource::new("repo", &ResourceTypes::mock());
-        let repo_dev = Resource::new("repo-dev", &ResourceTypes::mock());
+        let repo = Resource::new("repo", &mock_resource_type());
+        let repo_dev = Resource::new("repo-dev", &mock_resource_type());
         let ci = Resource::git("https://github.com/concourse/examples.git", "").with_name("ci");
 
         let pipeline = Pipeline::new().append(
@@ -554,8 +558,8 @@ resource_types:
     // https://concourse-ci.org/task-step.html
     #[test]
     fn output_mapping() {
-        let repo = Resource::new("repo", &ResourceTypes::mock());
-        let repo_dev = Resource::new("repo-dev", &ResourceTypes::mock());
+        let repo = Resource::new("repo", &mock_resource_type());
+        let repo_dev = Resource::new("repo-dev", &mock_resource_type());
         let ci = Resource::git("https://github.com/concourse/examples.git", "").with_name("ci");
 
         let pipeline = Pipeline::new().append(

@@ -4,7 +4,6 @@ use crate::schema::DirPath;
 use crate::schema::EnvVars;
 use crate::schema::FilePath;
 use crate::schema::Identifier;
-use crate::schema::Vars;
 use crate::step::Step;
 use names::Generator;
 use serde::ser::SerializeStruct;
@@ -285,7 +284,7 @@ impl TaskResource {
 
 #[derive(Debug, Clone)]
 pub(crate) enum TaskDef {
-    File { file: FilePath, vars: Vars },
+    File { file: FilePath },
     Config { config: TaskConfig },
 }
 
@@ -393,7 +392,6 @@ impl Task {
             task: Generator::default().next().unwrap(),
             task_def: TaskDef::File {
                 file: file.to_string(),
-                vars: BTreeMap::new(),
             },
             image: None,
             priviledged: false,

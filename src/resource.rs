@@ -125,10 +125,6 @@ impl ResourceTypes {
             ),
         }
     }
-
-    pub(crate) fn mock() -> Self {
-        ResourceTypes::new("mock", ResourceTypes::RegistryImage)
-    }
 }
 
 #[derive(Debug, Clone)]

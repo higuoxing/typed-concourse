@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             Job::new("foo").then(
                 Task::new()
                     .with_name("hello-world")
-                    .with_inputs(&vec![&some_git_repo.as_task_input_resource()])
+                    .with_inputs(&[&some_git_repo.as_task_input_resource()])
                     .run(&Command::new("echo", &vec!["hello, world"]))
                     .to_step(),
             ),
