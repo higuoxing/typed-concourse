@@ -30,30 +30,26 @@ impl Pipeline {
         }
     }
 
-    pub fn with_background(&self, uri: &str) -> Self {
-        let mut this = self.clone();
-        this.display = Some(DisplayConfig {
+    pub fn with_background(mut self, uri: &str) -> Self {
+        self.display = Some(DisplayConfig {
             background_image: uri.to_string(),
         });
-        this
+        self
     }
 
-    pub fn with_resources(&self, resources: Vec<Resource>) -> Self {
-        let mut this = self.clone();
-        this.resources = resources;
-        this
+    pub fn with_resources(mut self, resources: Vec<Resource>) -> Self {
+        self.resources = resources;
+        self
     }
 
-    pub fn with_resource_types(&self, resource_types: Vec<ResourceTypes>) -> Self {
-        let mut this = self.clone();
-        this.resource_types = resource_types;
-        this
+    pub fn with_resource_types(mut self, resource_types: Vec<ResourceTypes>) -> Self {
+        self.resource_types = resource_types;
+        self
     }
 
-    pub fn append(&self, job: Job) -> Self {
-        let mut this = self.clone();
-        this.jobs.push(job);
-        this
+    pub fn append(mut self, job: Job) -> Self {
+        self.jobs.push(job);
+        self
     }
 
     pub fn jobs(&self) -> &[Job] {

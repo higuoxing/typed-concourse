@@ -61,10 +61,9 @@ impl Input {
         }
     }
 
-    pub fn with_path(&self, path: &str) -> Self {
-        let mut this = self.clone();
-        this.path = Some(path.to_string());
-        this
+    pub fn with_path(mut self, path: &str) -> Self {
+        self.path = Some(path.to_string());
+        self
     }
 }
 
@@ -83,10 +82,9 @@ impl Output {
         }
     }
 
-    pub fn with_path(&self, path: &str) -> Self {
-        let mut this = self.clone();
-        this.path = Some(path.to_string());
-        this
+    pub fn with_path(mut self, path: &str) -> Self {
+        self.path = Some(path.to_string());
+        self
     }
 }
 
@@ -147,44 +145,38 @@ impl TaskConfig {
         todo!("Generating default config for Darwin platform")
     }
 
-    pub fn with_platform(&self, platform: Platform) -> Self {
-        let mut this = self.clone();
-        this.platform = platform;
-        this
+    pub fn with_platform(mut self, platform: Platform) -> Self {
+        self.platform = platform;
+        self
     }
 
-    pub fn with_image_resource(&self, image_resource: &TaskImageResource) -> Self {
-        let mut this = self.clone();
-        this.image_resource = image_resource.clone();
-        this
+    pub fn with_image_resource(mut self, image_resource: &TaskImageResource) -> Self {
+        self.image_resource = image_resource.clone();
+        self
     }
 
-    pub fn run(&self, command: &Command) -> Self {
-        let mut this = self.clone();
-        this.run = command.clone();
-        this
+    pub fn run(mut self, command: &Command) -> Self {
+        self.run = command.clone();
+        self
     }
 
-    pub fn with_env(&self, env: &[(&str, &str)]) -> Self {
-        let mut this = self.clone();
-        this.params = Some(
+    pub fn with_env(mut self, env: &[(&str, &str)]) -> Self {
+        self.params = Some(
             env.iter()
                 .map(|(k, v)| (k.to_string(), v.to_string()))
                 .collect(),
         );
-        this
+        self
     }
 
-    pub fn with_inputs(&self, inputs: Vec<Input>) -> Self {
-        let mut this = self.clone();
-        this.inputs = Some(inputs);
-        this
+    pub fn with_inputs(mut self, inputs: Vec<Input>) -> Self {
+        self.inputs = Some(inputs);
+        self
     }
 
-    pub fn with_outputs(&self, outputs: Vec<Output>) -> Self {
-        let mut this = self.clone();
-        this.outputs = Some(outputs);
-        this
+    pub fn with_outputs(mut self, outputs: Vec<Output>) -> Self {
+        self.outputs = Some(outputs);
+        self
     }
 }
 
@@ -208,16 +200,12 @@ impl TaskResource {
         Self::Unbound
     }
 
-    pub fn map_from(&self, map_from_name: &str) -> Self {
+    pub fn map_from(self, map_from_name: &str) -> Self {
         match self {
-            Self::Output {
-                ref name,
-                ref map_to,
-                ..
-            } => Self::Output {
-                name: name.clone(),
+            Self::Output { name, map_to, .. } => Self::Output {
+                name,
                 map_from: Some(map_from_name.to_string()),
-                map_to: map_to.clone(),
+                map_to,
             },
             _ => {
                 panic!("map_from() can only be used with 'Output' TaskResource")
@@ -225,16 +213,14 @@ impl TaskResource {
         }
     }
 
-    pub fn get_as(&self, name: &str) -> TaskResource {
-        match &self {
+    pub fn get_as(self, name: &str) -> TaskResource {
+        match self {
             Self::Resource {
-                ref resource,
-                ref map_to,
-                ..
+                resource, map_to, ..
             } => Self::Resource {
-                resource: resource.clone(),
+                resource,
                 get_as: Some(name.to_string()),
-                map_to: map_to.clone(),
+                map_to,
             },
             _ => {
                 panic!(
@@ -244,33 +230,27 @@ impl TaskResource {
         }
     }
 
-    pub fn map_to(&self, name: &str) -> TaskResource {
-        match &self {
+    pub fn map_to(self, name: &str) -> TaskResource {
+        match self {
             Self::Resource {
-                ref resource,
-                ref get_as,
-                ..
+                resource, get_as, ..
             } => Self::Resource {
-                resource: resource.clone(),
-                get_as: get_as.clone(),
+                resource,
+                get_as,
                 map_to: Some(name.to_string()),
             },
-            Self::Output {
-                ref name,
-                ref map_from,
-                ..
-            } => Self::Output {
+            Self::Output { name, map_from, .. } => Self::Output {
                 name: name.clone(),
-                map_to: Some(name.to_string()),
-                map_from: map_from.clone(),
+                map_to: Some(name),
+                map_from,
             },
             _ => panic!("map_to() cannot apply on unbound TaskResource"),
         }
     }
 
-    pub fn bind(&self, to: &mut Self) -> Self {
+    pub fn bind(self, to: &mut Self) -> Self {
         *to = self.clone();
-        self.clone()
+        self
     }
 
     pub fn output(identifier: &str) -> Self {
@@ -406,74 +386,62 @@ impl Task {
         }
     }
 
-    pub fn with_platform(&self, platform: Platform) -> Self {
-        let mut this = self.clone();
-        this = this.mutate_task_config(|task_config| task_config.with_platform(platform));
-        this
+    pub fn with_platform(mut self, platform: Platform) -> Self {
+        self = self.mutate_task_config(|task_config| task_config.with_platform(platform));
+        self
     }
 
-    pub fn with_name(&self, name: &str) -> Self {
-        let mut this = self.clone();
-        this.task = name.to_string();
-        this
+    pub fn with_name(mut self, name: &str) -> Self {
+        self.task = name.to_string();
+        self
     }
 
-    pub fn run(&self, command: &Command) -> Self {
+    pub fn run(mut self, command: &Command) -> Self {
         match self.task_def {
             TaskDef::File { .. } => panic!(
                 ".run() cannot be called in 'task' ('{}') that is initialized from 'file'.",
                 self.task.as_str()
             ),
-            TaskDef::Config { ref config } => {
-                let mut this = self.clone();
-                let mut this_config = config.clone();
-                this_config.run = command.clone();
-                this.task_def = TaskDef::Config {
-                    config: this_config,
-                };
-                this
+            TaskDef::Config { mut config } => {
+                config.run = command.clone();
+                self.task_def = TaskDef::Config { config };
+                self
             }
         }
     }
 
-    pub fn with_image(&self, image: TaskImageResource) -> Self {
-        let mut this = self.clone();
-        this.image = Some(image);
-        this
+    pub fn with_image(mut self, image: TaskImageResource) -> Self {
+        self.image = Some(image);
+        self
     }
 
-    pub fn with_image_resource(&self, image_resource: TaskImageResource) -> Self {
+    pub fn with_image_resource(mut self, image_resource: TaskImageResource) -> Self {
         match self.task_def {
             TaskDef::File { .. } => panic!(".with_image_resource() cannot be called in 'task' ('{}') that is initialized from 'file'.", self.task.as_str()),
             TaskDef::Config {
-                ref config,
+                mut config,
             } => {
-                let mut this_config = config.clone();
-                this_config.image_resource = image_resource;
-                let mut this = self.clone();
-                this.task_def = TaskDef::Config {
-                    config: this_config,
+                config.image_resource = image_resource;
+                self.task_def = TaskDef::Config {
+                    config
                 };
-                this
+		self
             }
         }
     }
 
-    pub fn with_params(&self, params: &[(&str, &str)]) -> Self {
-        let mut this = self.clone();
-        this.params = Some(
+    pub fn with_params(mut self, params: &[(&str, &str)]) -> Self {
+        self.params = Some(
             params
                 .iter()
                 .map(|(k, v)| (k.to_string(), v.to_string()))
                 .collect(),
         );
-        this
+        self
     }
 
-    pub fn with_inputs(&self, inputs: &[&TaskResource]) -> Self {
-        let mut this = self.clone();
-
-        this.inputs = Some(
+    pub fn with_inputs(mut self, inputs: &[&TaskResource]) -> Self {
+        self.inputs = Some(
             inputs
                 .iter()
                 .map(|inp| inp.clone().clone())
@@ -553,17 +521,16 @@ impl Task {
         };
 
         if !input_mapping.is_empty() {
-            this.input_mapping = Some(input_mapping);
+            self.input_mapping = Some(input_mapping);
         }
 
-        this
+        self
     }
 
-    pub fn with_outputs(&self, outputs: &[&TaskResource]) -> Self {
+    pub fn with_outputs(mut self, outputs: &[&TaskResource]) -> Self {
         if outputs.is_empty() {
-            self.clone()
+            self
         } else {
-            let mut this = self.clone();
             let mut output_mapping = BTreeMap::new();
             let outputs = outputs
                 .iter()
@@ -581,53 +548,49 @@ impl Task {
                     _ => panic!("Only 'Output' TaskResource can be used in with_outputs()"),
                 })
                 .collect::<Vec<TaskResource>>();
-            this.outputs = Some(outputs);
-            this.output_mapping = if !output_mapping.is_empty() {
+            self.outputs = Some(outputs);
+            self.output_mapping = if !output_mapping.is_empty() {
                 Some(output_mapping)
             } else {
                 None
             };
-            this
+            self
         }
     }
 
-    pub fn mutate_task_config<F: Fn(&TaskConfig) -> TaskConfig>(
-        &self,
+    pub fn mutate_task_config<F: Fn(TaskConfig) -> TaskConfig>(
+        mut self,
         task_config_mutator: F,
     ) -> Self {
         match self.task_def {
             TaskDef::File { .. } => panic!(".mutate_task_config() cannot be called in 'task' ('{}') that is initialized from 'file'.", self.task.as_str()),
             TaskDef::Config {
-                ref config,
+                config,
             } => {
-                let mut this = self.clone();
-                this.task_def = TaskDef::Config {
+                self.task_def = TaskDef::Config {
                     config: task_config_mutator(config),
                 };
-                this
+		self
             }
         }
     }
 
-    pub fn to_step(&self) -> Step {
-        Step::Task(self.clone())
+    pub fn to_step(self) -> Step {
+        Step::Task(self)
     }
 
-    pub fn on_failure(&self, step: Step) -> Self {
-        let mut this = self.clone();
-        this.on_failure = Some(Box::new(step));
-        this
+    pub fn on_failure(mut self, step: Step) -> Self {
+        self.on_failure = Some(Box::new(step));
+        self
     }
 
-    pub fn on_abort(&self, step: Step) -> Self {
-        let mut this = self.clone();
-        this.on_abort = Some(Box::new(step));
-        this
+    pub fn on_abort(mut self, step: Step) -> Self {
+        self.on_abort = Some(Box::new(step));
+        self
     }
 
-    pub fn on_success(&self, step: Step) -> Self {
-        let mut this = self.clone();
-        this.on_success = Some(Box::new(step));
-        this
+    pub fn on_success(mut self, step: Step) -> Self {
+        self.on_success = Some(Box::new(step));
+        self
     }
 }

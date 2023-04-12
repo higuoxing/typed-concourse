@@ -66,25 +66,22 @@ impl Get {
         self
     }
 
-    pub fn with_trigger(&self, trigger: bool) -> Self {
-        let mut this = self.clone();
-        this.trigger = trigger;
-        this
+    pub fn with_trigger(mut self, trigger: bool) -> Self {
+        self.trigger = trigger;
+        self
     }
 
-    pub fn with_passed(&self, jobs: &[Job]) -> Self {
-        let mut this = self.clone();
-        this.passed = Some(jobs.to_vec());
-        this
+    pub fn with_passed(mut self, jobs: &[Job]) -> Self {
+        self.passed = Some(jobs.to_vec());
+        self
     }
 
-    pub fn get(&self) -> Step {
-        Step::Get(self.clone())
+    pub fn get(self) -> Step {
+        Step::Get(self)
     }
 
-    pub fn get_as(&self, alias: &str) -> Step {
-        let mut this = self.clone();
-        this.get = alias.to_string();
-        Step::Get(this)
+    pub fn get_as(mut self, alias: &str) -> Step {
+        self.get = alias.to_string();
+        Step::Get(self)
     }
 }

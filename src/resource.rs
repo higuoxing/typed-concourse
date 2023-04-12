@@ -71,25 +71,24 @@ impl ResourceTypes {
         }
     }
 
-    pub fn with_source(&self, new_source: &[(&str, &str)]) -> Self {
+    pub fn with_source(self, new_source: &[(&str, &str)]) -> Self {
         match self {
             Self::Custom {
-                ref name,
-                ref type_,
-                ref source,
-                ref params,
+                name,
+                type_,
+                mut source,
+                params,
             } => {
-                let mut source = source.clone();
                 new_source
                     .iter()
                     .map(|(k, v)| source.insert(k.to_string(), v.to_string()))
                     .count();
 
                 Self::Custom {
-                    name: name.clone(),
-                    type_: type_.clone(),
+                    name,
+                    type_,
                     source,
-                    params: params.clone(),
+                    params,
                 }
             }
             unsupported => panic!(
@@ -99,24 +98,23 @@ impl ResourceTypes {
         }
     }
 
-    pub fn with_params(&self, new_params: &[(&str, &str)]) -> Self {
+    pub fn with_params(self, new_params: &[(&str, &str)]) -> Self {
         match self {
             Self::Custom {
-                ref name,
-                ref type_,
-                ref source,
-                ref params,
+                name,
+                type_,
+                source,
+                mut params,
             } => {
-                let mut params = params.clone();
                 new_params
                     .iter()
                     .map(|(k, v)| params.insert(k.to_string(), v.to_string()))
                     .count();
 
                 Self::Custom {
-                    name: name.clone(),
-                    type_: type_.clone(),
-                    source: source.clone(),
+                    name,
+                    type_,
+                    source,
                     params,
                 }
             }
@@ -236,28 +234,23 @@ impl Resource {
         todo!()
     }
 
-    pub fn with_name(&self, name: &str) -> Self {
-        let mut this = self.clone();
-        this.name = name.to_string();
-        this
+    pub fn with_name(mut self, name: &str) -> Self {
+        self.name = name.to_string();
+        self
     }
 
-    pub fn with_icon(&self, icon: &str) -> Self {
-        let mut this = self.clone();
-
-        this.icon = if icon == "" {
+    pub fn with_icon(mut self, icon: &str) -> Self {
+        self.icon = if icon == "" {
             None
         } else {
             Some(icon.to_string())
         };
-
-        this
+        self
     }
 
-    pub fn with_trigger(&self, trigger: bool) -> Self {
-        let mut this = self.clone();
-        this.trigger = trigger;
-        this
+    pub fn with_trigger(mut self, trigger: bool) -> Self {
+        self.trigger = trigger;
+        self
     }
 
     pub fn name(&self) -> Identifier {
@@ -324,21 +317,19 @@ impl AnonymousResource {
         }
     }
 
-    pub fn with_params(&self, params: &[(&str, &str)]) -> Self {
-        let mut this = self.clone();
-        this.params = Some(
+    pub fn with_params(mut self, params: &[(&str, &str)]) -> Self {
+        self.params = Some(
             params
                 .iter()
                 .map(|(k, v)| (k.to_string(), v.to_string()))
                 .collect(),
         );
-        this
+        self
     }
 
-    pub fn with_version(&self, version: Version) -> Self {
-        let mut this = self.clone();
-        this.version = Some(version);
-        this
+    pub fn with_version(mut self, version: Version) -> Self {
+        self.version = Some(version);
+        self
     }
 }
 

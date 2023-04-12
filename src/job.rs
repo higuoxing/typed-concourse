@@ -67,65 +67,56 @@ impl Job {
         self.name.clone()
     }
 
-    pub fn with_public(&self, is_public: bool) -> Self {
-        let mut this = self.clone();
-        this.public = Some(is_public);
-        this
+    pub fn with_public(mut self, is_public: bool) -> Self {
+        self.public = Some(is_public);
+        self
     }
 
-    pub fn with_serial(&self, is_serial: bool) -> Self {
-        let mut this = self.clone();
-        this.serial = Some(is_serial);
-        this
+    pub fn with_serial(mut self, is_serial: bool) -> Self {
+        self.serial = Some(is_serial);
+        self
     }
 
-    pub fn then(&self, step: Step) -> Self {
-        let mut this = self.clone();
-        this.plan.push(step);
-        this
+    pub fn then(mut self, step: Step) -> Self {
+        self.plan.push(step);
+        self
     }
 
-    pub fn try_(&self, step: Step) -> Self {
-        let mut this = self.clone();
-        this.plan.push(Step::Try(Try {
+    pub fn try_(mut self, step: Step) -> Self {
+        self.plan.push(Step::Try(Try {
             try_: Box::new(step),
         }));
-        this
+        self
     }
 
-    pub fn parallel(&self, steps: &[Step]) -> Self {
-        let mut this = self.clone();
-        this.plan
+    pub fn parallel(mut self, steps: &[Step]) -> Self {
+        self.plan
             .push(Step::InParallel(InParallel::Steps(steps.to_vec())));
-        this
+        self
     }
 
-    pub fn on_failure(&self, step: Step) -> Self {
-        let mut this = self.clone();
-        this.on_failure = Some(step);
-        this
+    pub fn on_failure(mut self, step: Step) -> Self {
+        self.on_failure = Some(step);
+        self
     }
 
-    pub fn on_error(&self, step: Step) -> Self {
-        let mut this = self.clone();
-        this.on_error = Some(step);
-        this
+    pub fn on_error(mut self, step: Step) -> Self {
+        self.on_error = Some(step);
+        self
     }
 
-    pub fn on_abort(&self, step: Step) -> Self {
-        let mut this = self.clone();
-        this.on_abort = Some(step);
-        this
+    pub fn on_abort(mut self, step: Step) -> Self {
+        self.on_abort = Some(step);
+        self
     }
 
-    pub fn on_success(&self, step: Step) -> Self {
-        let mut this = self.clone();
-        this.on_success = Some(step);
-        this
+    pub fn on_success(mut self, step: Step) -> Self {
+        self.on_success = Some(step);
+        self
     }
 
     pub fn fallible(
-        &self,
+        mut self,
         on_failure: Option<Step>,
         on_error: Option<Step>,
         on_abort: Option<Step>,
@@ -135,17 +126,15 @@ impl Job {
                 "One of on_failure, on_error, on_abort hooks must be specified in fallible jobs."
             );
         }
-        let mut this = self.clone();
-        this.on_failure = on_failure;
-        this.on_error = on_error;
-        this.on_abort = on_abort;
-        this
+        self.on_failure = on_failure;
+        self.on_error = on_error;
+        self.on_abort = on_abort;
+        self
     }
 
-    pub fn ensure(&self, ensure: Step) -> Self {
-        let mut this = self.clone();
-        this.ensure = Some(ensure);
-        this
+    pub fn ensure(mut self, ensure: Step) -> Self {
+        self.ensure = Some(ensure);
+        self
     }
 
     pub fn plan(&self) -> &[Step] {

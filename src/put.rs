@@ -40,13 +40,12 @@ impl Put {
         }
     }
 
-    pub fn with_params(&self, params: &[(&str, &str)]) -> Self {
-        let mut this = self.clone();
-        this.params = params
+    pub fn with_params(mut self, params: &[(&str, &str)]) -> Self {
+        self.params = params
             .iter()
             .map(|(k, v)| (k.to_string(), v.to_string()))
             .collect();
-        this
+        self
     }
 
     pub fn put(self) -> Step {
